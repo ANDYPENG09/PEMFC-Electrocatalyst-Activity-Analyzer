@@ -2,11 +2,7 @@
 
 A self-contained, offline electrochemistry calculator for **PEM fuel cell catalyst characterization** — compute ECSA (H-upd), mass activity (MA), and specific activity (SA) from cyclic voltammetry (CV) and linear sweep voltammetry (LSV) data, directly in your browser with zero dependencies.
 
-![Apple-style UI](https://img.shields.io/badge/UI-Apple%20HIG-blue)
-
-![Offline](https://img.shields.io/badge/Offline-100%25-brightgreen)
-
-![License](https://img.shields.io/badge/License-MIT-yellow)
+![Apple-style UI](https://img.shields.io/badge/UI-Apple%20HIG-blue) ![Offline](https://img.shields.io/badge/Offline-100%25-brightgreen) ![License](https://img.shields.io/badge/License-MIT-yellow)
 
 ## Features
 
@@ -33,12 +29,12 @@ $$
 \text{ECSA} = \frac{100 \cdot S_H}{q \cdot v \cdot m_{\text{Pt}}}
 $$
 
-| Symbol           | Meaning                               | Default         |
-| ---------------- | ------------------------------------- | --------------- |
-| $S_H$            | H-upd desorption peak area (mA·V/cm²) | Auto from CV    |
-| $q$              | H-upd charge constant                 | 0.21 mC/cm²     |
-| $v$              | Scan rate (V/s)                       | 0.02 (20 mV/s)  |
-| $m\_{\text{Pt}}$ | Pt loading (µg/cm²)                   | From ink params |
+| Symbol | Meaning | Default |
+|--------|---------|---------|
+| $S_H$ | H-upd desorption peak area (mA·V/cm²) | Auto from CV |
+| $q$ | H-upd charge constant | 0.21 mC/cm² |
+| $v$ | Scan rate (V/s) | 0.02 (20 mV/s) |
+| $m_{\text{Pt}}$ | Pt loading (µg/cm²) | From ink params |
 
 ### Mass Activity (MA)
 
@@ -84,11 +80,11 @@ electrochem_template/
 
 ## Browser Compatibility
 
-| Browser       | Status            |
-| ------------- | ----------------- |
+| Browser | Status |
+|---------|--------|
 | Chrome / Edge | ✅ Fully supported |
-| Safari        | ✅ Fully supported |
-| Firefox       | ✅ Fully supported |
+| Safari | ✅ Fully supported |
+| Firefox | ✅ Fully supported |
 
 ## License
 
