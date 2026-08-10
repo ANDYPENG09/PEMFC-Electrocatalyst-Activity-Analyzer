@@ -1,0 +1,1918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PEMFC Electrocatalyst Activity Analyzer &middot; ECSA / MA / SA</title>
+<style>
+  :root{
+    --bg:#f5f5f7; --panel:#ffffff;
+    --ink:#1d1d1f; --ink2:#424245; --muted:#86868b;
+    --line:#d2d2d7; --line2:#e8e8ed;
+    --accent:#0071e3; --accent-hover:#0077ed; --accent-soft:#e8f4fd;
+    --success:#34c759; --warn:#ff9500; --danger:#ff3b30;
+    --radius:12px; --radius-sm:8px; --radius-pill:980px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);}
+  body{
+    font:14px/1.5 -apple-system,"SF Pro Display","SF Pro Text","Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+  }
+  .wrap{max-width:1120px;margin:0 auto;padding:48px 28px 80px;}
+  header{margin-bottom:32px;}
+  header h1{font-size:34px;font-weight:700;letter-spacing:-0.02em;margin:0;line-height:1.15;}
+  header p{margin:8px 0 0;color:var(--muted);font-size:15px;font-weight:400;}
+  .card{
+    background:var(--panel);border:none;
+    border-radius:var(--radius);padding:24px 28px;margin-bottom:20px;
+    box-shadow:0 1px 3px rgba(0,0,0,0.04),0 4px 12px rgba(0,0,0,0.03);
+  }
+  .card-title{
+    font-size:15px;font-weight:600;color:var(--ink);
+    margin:0 0 18px;letter-spacing:-0.01em;
+  }
+  label{display:block;font-size:13px;font-weight:500;color:var(--ink2);margin:0 0 6px;letter-spacing:-0.005em;}
+  .hint{font-size:12px;color:var(--muted);font-weight:400;}
+  .grid{display:grid;gap:16px;}
+  .g-2{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .g-3{grid-template-columns:repeat(3,minmax(0,1fr));}
+  .g-4{grid-template-columns:repeat(4,minmax(0,1fr));}
+  @media(max-width:780px){.g-2,.g-3,.g-4{grid-template-columns:1fr;}}
+  .field{min-width:0;}
+  input[type=text],input[type=number],select,textarea{
+    width:100%;font:inherit;font-size:14px;color:var(--ink);
+    background:#fff;border:1px solid var(--line);border-radius:var(--radius-sm);
+    padding:8px 12px;outline:none;transition:border-color .2s,box-shadow .2s;
+  }
+  input[type=number],select{height:36px;}
+  textarea{min-height:120px;padding:10px 12px;font-family:ui-monospace,"SF Mono",Consolas,monospace;font-size:13px;line-height:1.5;resize:vertical;}
+  input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,113,227,0.15);}
+  input[readonly]{background:#f5f5f7;color:var(--ink2);border-color:#e8e8ed;}
+  .btn{
+    appearance:none;display:inline-flex;align-items:center;justify-content:center;
+    height:36px;padding:0 18px;border:none;border-radius:var(--radius-pill);
+    background:var(--accent);color:#fff;font:inherit;font-size:14px;font-weight:500;
+    cursor:pointer;transition:all .2s;letter-spacing:-0.005em;
+  }
+  .btn:hover{background:var(--accent-hover);transform:scale(1.01);}
+  .btn:active{transform:scale(0.98);}
+  .btn-secondary{background:var(--accent-soft);color:var(--accent);border-radius:var(--radius-pill);}
+  .btn-secondary:hover{background:#d6eaf8;}
+  .btn-danger{background:#fff;color:var(--danger);border:1px solid #f5c2c6;border-radius:var(--radius-pill);}
+  .btn-danger:hover{background:#fff5f5;}
+  .btn-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px;}
+  details{margin-top:14px;}
+  details summary{font-size:13px;color:var(--ink2);cursor:pointer;padding:6px 0;font-weight:500;}
+  details[open] summary{margin-bottom:10px;}
+  .advanced{border-top:1px solid var(--line2);padding-top:16px;margin-top:16px;}
+  .advanced .grid{gap:16px;}
+  .result{
+    background:#f5f5f7;border-radius:var(--radius-sm);padding:16px 18px;margin-top:16px;
+  }
+  .result-row{display:flex;justify-content:space-between;padding:7px 0;font-size:14px;}
+  .result-row + .result-row{border-top:1px solid var(--line2);}
+  .result-row span:last-child{font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink);}
+  table.summary{
+    width:100%;border-collapse:separate;border-spacing:0;
+    border:none;border-radius:var(--radius);overflow:hidden;
+    margin-top:10px;background:#fff;
+    box-shadow:0 1px 3px rgba(0,0,0,0.04),0 4px 12px rgba(0,0,0,0.03);
+  }
+  table.summary th{
+    background:rgba(0,0,0,0.04);color:var(--muted);font-size:12px;font-weight:500;
+    letter-spacing:0.02em;padding:12px 16px;text-align:left;
+    border-bottom:1px solid var(--line2);
+  }
+  table.summary td{padding:16px;font-size:20px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums;}
+  table.summary td .u{display:block;font-size:12px;font-weight:400;color:var(--muted);margin-top:2px;letter-spacing:0;}
+  .plot{margin-top:14px;background:#fff;border:none;border-radius:var(--radius-sm);padding:14px;
+    box-shadow:0 1px 3px rgba(0,0,0,0.04),0 4px 12px rgba(0,0,0,0.03);}
+  .plot svg{display:block;width:100%;height:auto;}
+  .plot-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px;}
+  @media(max-width:900px){.plot-grid{grid-template-columns:1fr;}}
+  .std-desc{font-size:13px;color:var(--ink2);line-height:1.65;margin-top:12px;}
+  footer{margin-top:32px;color:var(--muted);font-size:12px;text-align:center;}
+  .frac-tag{
+    display:inline-block;padding:3px 8px;border-radius:6px;
+    background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:500;
+    margin-left:6px;cursor:pointer;border:1px solid transparent;transition:all .2s;
+  }
+  .frac-tag:hover{border-color:var(--accent);background:#d6eaf8;}
+  .frac-tag.active{background:var(--accent);color:#fff;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>PEMFC Electrocatalyst Activity Analyzer</h1>
+  <p>Hupd background subtraction &middot; ECSA &middot; ORR mass/specific activity &middot; Offline calculation</p>
+</header>
+
+<!-- Standard info -->
+<div class="card">
+  <div class="card-title">Test Standard</div>
+  <p class="std-desc">Based on GB/T 20042.4-2025. Methods are compatible with US DOE and EU JRC/IEC protocols (Hupd ECSA, K-L kinetic current, q = 0.21 mC/cm²).</p>
+</div>
+
+<!-- ECSA -->
+<div class="card">
+  <div class="card-title">Electrochemical Surface Area (ECSA &middot; Hupd Method)</div>
+
+  <div class="grid g-3">
+    <div class="field">
+      <label>Scan Rate</label>
+      <div style="display:flex;gap:6px;">
+        <input type="number" id="vrate" step="any" value="0.02" style="flex:1">
+        <select id="vUnit" style="width:88px;flex:none;">
+          <option value="V/s" selected>V/s</option>
+          <option value="mV/s">mV/s</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label>Pt Monolayer Charge q<sub>spec</sub></label>
+      <div style="display:flex;gap:6px;">
+        <input type="number" id="qspec" step="any" value="0.21" style="flex:1">
+        <select id="qUnit" style="width:96px;flex:none;">
+          <option value="mC/cm²" selected>mC/cm²</option>
+          <option value="uC/cm²">µC/cm²</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label>RDE Geometric Area (cm²)</label>
+      <input type="number" id="area" step="any" value="0.19625">
+    </div>
+  </div>
+
+  <div class="grid g-4" style="margin-top:14px;">
+    <div class="field">
+      <label>Ink Concentration (mg/mL)</label>
+      <input type="number" id="inkConc" step="any" value="1">
+    </div>
+    <div class="field">
+      <label>Drop Volume (µL)</label>
+      <input type="number" id="dropVol" step="any" value="8">
+    </div>
+    <div class="field">
+      <label>Pt Weight Fraction (%)</label>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <input type="number" id="ptFrac" step="any" value="30" style="flex:1;min-width:0;">
+        <span class="frac-tag" data-f="30">30%</span>
+        <span class="frac-tag" data-f="50">50%</span>
+      </div>
+    </div>
+    <div class="field">
+      <label>&rarr; Pt Loading (µg/cm²)</label>
+      <input type="number" id="ptLoad" step="any" readonly>
+    </div>
+  </div>
+
+  <details class="advanced">
+    <summary>Advanced Integration Settings</summary>
+    <div class="grid g-2">
+      <div class="field">
+        <label>Hupd Lower Limit (V)</label>
+        <input type="number" id="hlo" step="any" value="0.05">
+      </div>
+      <div class="field">
+        <label>Hupd Upper Limit (V)</label>
+        <input type="number" id="hhi" step="any" value="0.40">
+      </div>
+    </div>
+    <div class="grid g-2" style="margin-top:14px;">
+      <div class="field">
+        <label>Baseline Subtraction Mode</label>
+        <select id="baselineMode">
+          <option value="origin" selected>Origin-style &middot; End-plateau horizontal baseline</option>
+          <option value="manual">Manual horizontal baseline</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Manual Baseline Current Density (mA/cm²) <span class="hint">Manual mode only</span></label>
+        <input type="number" id="baseline" step="any" placeholder="e.g. 0.030">
+      </div>
+    </div>
+  </details>
+
+  <div class="grid g-2" style="margin-top:14px;">
+    <div class="field">
+      <label>Potential</label>
+      <select id="cvPotUnit"><option value="V" selected>V</option><option value="mV">mV</option><option value="uV">µV</option></select>
+    </div>
+    <div class="field">
+      <label>Current</label>
+      <select id="cvCurUnit"><option value="A" selected>A</option><option value="mA">mA</option><option value="uA">µA</option></select>
+    </div>
+  </div>
+
+  <div class="field" style="margin-top:10px;">
+    <label>CV Data (two columns: potential, current; space/comma/tab separated)</label>
+    <textarea id="cvText" placeholder="0.05, -4.4e-5&#10;0.10, 2.8e-5&#10;..."></textarea>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn" id="cvBtn">Calculate ECSA</button>
+    <button class="btn-secondary btn" id="cvPng">Download CV Plot</button>
+    <button class="btn-danger btn" id="cvClear">Clear CV</button>
+    <button class="btn-secondary btn" id="loadExample">Load Example Data</button>
+  </div>
+  <p class="hint" id="cvMsg"></p>
+
+  <div class="plot-grid">
+    <div class="plot" id="cvPlotFull"></div>
+    <div class="plot" id="cvPlotZoom"></div>
+  </div>
+
+  <div class="result">
+    <div class="result-row"><span>S<sub>H</sub> (mA&middot;V/cm²)</span><span id="o_SH">&mdash;</span></div>
+    <div class="result-row"><span>Q<sub>H</sub> (mC/cm²)</span><span id="o_QH">&mdash;</span></div>
+    <div class="result-row"><span>ECSA (m²/g<sub>Pt</sub>)</span><span id="o_ecsa">&mdash;</span></div>
+    <div class="result-row"><span>ECSA (cm²)</span><span id="o_ecsa_cm2">&mdash;</span></div>
+    <div class="result-row"><span>Roughness Factor RF</span><span id="o_rf">&mdash;</span></div>
+  </div>
+</div>
+
+<!-- MA -->
+<div class="card">
+  <div class="card-title">ORR Mass Activity / Specific Activity</div>
+
+  <div class="grid g-4">
+    <div class="field">
+      <label>Current Density j @ E (mA/cm²)</label>
+      <input type="number" id="jE" step="any" placeholder="e.g. 1.70">
+    </div>
+    <div class="field">
+      <label>Limiting Current j<sub>lim</sub> (mA/cm²)</label>
+      <input type="number" id="jlim" step="any" placeholder="e.g. 5.80">
+    </div>
+    <div class="field">
+      <label>Evaluation Potential E (V vs RHE)</label>
+      <input type="number" id="Ep" step="any" value="0.90">
+    </div>
+    <div class="field">
+      <label>j<sub>lim</sub> Evaluation Potential (V)</label>
+      <input type="number" id="jlimE" step="any" value="0.40">
+    </div>
+  </div>
+
+  <details class="advanced">
+    <summary>LSV Data (O<sub>2</sub> + N<sub>2</sub> Background)</summary>
+    <div class="grid g-3">
+      <div class="field"><label>O<sub>2</sub> Potential</label><select id="o2PotUnit"><option value="V" selected>V</option><option value="mV">mV</option><option value="uV">µV</option></select></div>
+      <div class="field"><label>O<sub>2</sub> Current</label><select id="o2CurUnit"><option value="A" selected>A</option><option value="mA">mA</option><option value="uA">µA</option></select></div>
+      <div class="field"><label>N<sub>2</sub> Current</label><select id="n2CurUnit"><option value="A" selected>A</option><option value="mA">mA</option><option value="uA">µA</option></select></div>
+    </div>
+    <div class="grid g-2" style="margin-top:10px;">
+      <div class="field">
+        <label>O<sub>2</sub> LSV</label>
+        <textarea id="lsvText" placeholder="0.20, -1.1e-3&#10;0.30, -3.5e-3&#10;..."></textarea>
+      </div>
+      <div class="field">
+        <label>N<sub>2</sub> Background</label>
+        <textarea id="n2Text" placeholder="0.20, -0.05e-3&#10;0.30, -0.06e-3&#10;..."></textarea>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="lsvBtn">N<sub>2</sub> Correct &amp; Extract</button>
+      <button class="btn-secondary btn" id="lsvPng">Download LSV Plot</button>
+      <button class="btn-danger btn" id="lsvClear">Clear LSV</button>
+    </div>
+    <p class="hint" id="lsvMsg"></p>
+  </details>
+
+  <div class="plot" id="lsvPlot" style="display:none;"></div>
+
+  <div class="result">
+    <div class="result-row"><span>Kinetic Current j<sub>k</sub> (mA/cm²)</span><span id="o_jk">&mdash;</span></div>
+    <div class="result-row"><span>Mass Activity MA (A/mg<sub>Pt</sub>)</span><span id="o_ma">&mdash;</span></div>
+    <div class="result-row"><span>Specific Activity SA (mA/cm²<sub>Pt</sub>)</span><span id="o_sa">&mdash;</span></div>
+  </div>
+</div>
+
+<!-- Summary -->
+<div class="card">
+  <div class="card-title">Results Summary</div>
+  <table class="summary">
+    <thead><tr><th>ECSA</th><th>MA</th><th>SA</th></thead>
+    <tbody>
+      <tr>
+        <td><span id="sumEcsa">&mdash;</span><span class="u">m²/g<sub>Pt</sub></span></td>
+        <td><span id="sumMa">&mdash;</span><span class="u">A/mg<sub>Pt</sub></span></td>
+        <td><span id="sumSa">&mdash;</span><span class="u">mA/cm²<sub>Pt</sub></span></td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="btn-row">
+    <button class="btn-secondary btn" id="exportCsv">Export CSV</button>
+  </div>
+</div>
+
+<footer>MIT License &middot; Author: ANDYPENG09 &middot; Pure HTML/JS &middot; Offline &middot; No Origin Required</footer>
+
+</div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const num = id => { const v = parseFloat($(id).value); return isNaN(v) ? NaN : v; };
+const fmt = (x, n=3) => isNaN(x) ? "\u2014" : x.toFixed(n);
+
+/* ===== Example Data ===== */
+const EXAMPLE_CV = `0.02668	-9.4167E-5
+0.02869	-7.3221E-6
+0.03374	3.7561E-5
+0.03875	5.2193E-5
+0.04375	5.754E-5
+0.04874	5.9742E-5
+0.05375	6.0616E-5
+0.05874	6.0969E-5
+0.06374	6.1103E-5
+0.06874	6.1216E-5
+0.07374	6.1277E-5
+0.07875	6.1359E-5
+0.08375	6.15E-5
+0.08875	6.1713E-5
+0.09375	6.1896E-5
+0.09875	6.2108E-5
+0.10374	6.232E-5
+0.10874	6.2756E-5
+0.11375	6.3266E-5
+0.11875	6.3945E-5
+0.12375	6.471E-5
+0.12874	6.5732E-5
+0.13375	6.6767E-5
+0.13874	6.7844E-5
+0.14374	6.8769E-5
+0.14873	6.9625E-5
+0.15374	7.0096E-5
+0.15874	7.0277E-5
+0.16375	7.016E-5
+0.16875	6.9862E-5
+0.17375	6.9365E-5
+0.17875	6.8819E-5
+0.18375	6.8236E-5
+0.18874	6.7808E-5
+0.19375	6.736E-5
+0.19874	6.6975E-5
+0.20375	6.6519E-5
+0.20874	6.6192E-5
+0.21375	6.5766E-5
+0.21874	6.5229E-5
+0.22375	6.4455E-5
+0.22874	6.3611E-5
+0.23374	6.2445E-5
+0.23874	6.1097E-5
+0.24375	5.9499E-5
+0.24875	5.7788E-5
+0.25375	5.5915E-5
+0.25875	5.4026E-5
+0.26375	5.1997E-5
+0.26875	5.0118E-5
+0.27375	4.8141E-5
+0.27875	4.6148E-5
+0.28375	4.4065E-5
+0.28874	4.207E-5
+0.29375	3.9996E-5
+0.29875	3.7976E-5
+0.30375	3.5964E-5
+0.30874	3.4086E-5
+0.31375	3.2282E-5
+0.31875	3.0564E-5
+0.32376	2.8952E-5
+0.32875	2.7441E-5
+0.33376	2.601E-5
+0.33877	2.4653E-5
+0.34376	2.3393E-5
+0.34876	2.2197E-5
+0.35376	2.108E-5
+0.35876	2.0048E-5
+0.36376	1.9142E-5
+0.36876	1.8328E-5
+0.37376	1.7581E-5
+0.37876	1.6879E-5
+0.38375	1.6256E-5
+0.38875	1.5693E-5
+0.39376	1.5178E-5
+0.39876	1.4692E-5
+0.40376	1.4289E-5
+0.40875	1.3896E-5
+0.41377	1.3545E-5
+0.41876	1.3222E-5
+0.42377	1.2943E-5
+0.42876	1.2683E-5
+0.43377	1.245E-5
+0.43876	1.2256E-5
+0.44377	1.2115E-5
+0.44876	1.1963E-5
+0.45376	1.1849E-5
+0.45876	1.1744E-5
+0.46377	1.1688E-5
+0.46876	1.1662E-5
+0.47376	1.1679E-5
+0.47876	1.1723E-5
+0.48377	1.1793E-5
+0.48876	1.1857E-5
+0.49377	1.1938E-5
+0.49876	1.2017E-5
+0.50377	1.2124E-5
+0.50876	1.2241E-5
+0.51377	1.2369E-5
+0.51877	1.2496E-5
+0.52377	1.2622E-5
+0.52877	1.2771E-5
+0.53377	1.2893E-5
+0.53877	1.3033E-5
+0.54376	1.3192E-5
+0.54876	1.3343E-5
+0.55377	1.3492E-5
+0.55876	1.3635E-5
+0.56377	1.3809E-5
+0.56877	1.3992E-5
+0.57377	1.4174E-5
+0.57877	1.4367E-5
+0.58377	1.4561E-5
+0.58876	1.4798E-5
+0.59377	1.5005E-5
+0.59876	1.5215E-5
+0.60378	1.5405E-5
+0.60876	1.5628E-5
+0.61377	1.583E-5
+0.61877	1.6048E-5
+0.62377	1.6265E-5
+0.62876	1.6485E-5
+0.63376	1.6694E-5
+0.63877	1.6926E-5
+0.64378	1.7189E-5
+0.64877	1.7403E-5
+0.65378	1.7639E-5
+0.65878	1.7863E-5
+0.66378	1.8139E-5
+0.66878	1.8424E-5
+0.67378	1.8768E-5
+0.67878	1.9161E-5
+0.68378	1.9633E-5
+0.68877	2.0145E-5
+0.69378	2.0717E-5
+0.69878	2.1376E-5
+0.70378	2.2109E-5
+0.70877	2.2947E-5
+0.71378	2.3879E-5
+0.71877	2.4913E-5
+0.72378	2.604E-5
+0.72878	2.7237E-5
+0.73378	2.845E-5
+0.73878	2.9683E-5
+0.74378	3.0918E-5
+0.74878	3.2171E-5
+0.75378	3.345E-5
+0.75878	3.4839E-5
+0.76377	3.6357E-5
+0.76878	3.8071E-5
+0.77378	3.9936E-5
+0.77877	4.1981E-5
+0.78378	4.4129E-5
+0.78877	4.6395E-5
+0.79377	4.8701E-5
+0.79877	5.1015E-5
+0.80378	5.3291E-5
+0.80877	5.5455E-5
+0.81379	5.7405E-5
+0.81878	5.9098E-5
+0.82379	6.0496E-5
+0.82877	6.1698E-5
+0.83378	6.2613E-5
+0.83878	6.3342E-5
+0.84379	6.377E-5
+0.84878	6.4104E-5
+0.85378	6.4132E-5
+0.85879	6.3985E-5
+0.86378	6.3586E-5
+0.86878	6.3114E-5
+0.87379	6.25E-5
+0.87878	6.1878E-5
+0.88379	6.1202E-5
+0.88879	6.0583E-5
+0.89379	5.996E-5
+0.89879	5.9388E-5
+0.90379	5.8803E-5
+0.90878	5.8311E-5
+0.91379	5.7835E-5
+0.91878	5.7408E-5
+0.92379	5.6988E-5
+0.92879	5.6671E-5
+0.93379	5.6364E-5
+0.93878	5.6106E-5
+0.94379	5.5857E-5
+0.94878	5.5679E-5
+0.95379	5.5495E-5
+0.95879	5.5367E-5
+0.9638	5.5245E-5
+0.9688	5.5136E-5
+0.97381	5.5037E-5
+0.97881	5.4929E-5
+0.9838	5.4844E-5
+0.9888	5.4751E-5
+0.99381	5.4668E-5
+0.9988	5.457E-5
+1.0038	5.4505E-5
+1.0088	5.4439E-5
+1.0138	5.4382E-5
+1.0188	5.4324E-5
+1.0238	5.4298E-5
+1.0288	5.4285E-5
+1.0338	5.4294E-5
+1.0388	5.4308E-5
+1.0438	5.4365E-5
+1.0488	5.443E-5
+1.0538	5.4524E-5
+1.0588	5.4619E-5
+1.0638	5.4762E-5
+1.0688	5.4913E-5
+1.0738	5.508E-5
+1.0788	5.5286E-5
+1.0838	5.5497E-5
+1.0888	5.5769E-5
+1.0938	5.6046E-5
+1.0988	5.6331E-5
+1.1038	5.6641E-5
+1.1088	5.699E-5
+1.1138	5.7345E-5
+1.1188	5.7723E-5
+1.1238	5.812E-5
+1.1288	5.854E-5
+1.1338	5.8977E-5
+1.1388	5.9415E-5
+1.1438	5.9875E-5
+1.1488	6.036E-5
+1.1538	6.0827E-5
+1.1588	6.1319E-5
+1.1638	6.1815E-5
+1.1688	6.2331E-5
+1.1738	6.2842E-5
+1.1788	6.3368E-5
+1.1838	6.3878E-5
+1.1888	6.4422E-5
+1.1938	6.4952E-5
+1.1988	6.5479E-5
+1.1967	3.1518E-5
+1.1918	1.9946E-5
+1.1867	1.2659E-5
+1.1818	7.5936E-6
+1.1768	3.7562E-6
+1.1718	8.6998E-7
+1.1668	-1.4048E-6
+1.1618	-3.1709E-6
+1.1568	-4.7198E-6
+1.1518	-5.9316E-6
+1.1468	-7.0144E-6
+1.1418	-7.8449E-6
+1.1368	-8.6769E-6
+1.1318	-9.3268E-6
+1.1268	-9.9613E-6
+1.1217	-1.0434E-5
+1.1167	-1.0994E-5
+1.1117	-1.1426E-5
+1.1067	-1.1871E-5
+1.1017	-1.2212E-5
+1.0967	-1.2638E-5
+1.0917	-1.2971E-5
+1.0867	-1.3369E-5
+1.0817	-1.3645E-5
+1.0767	-1.403E-5
+1.0717	-1.4353E-5
+1.0667	-1.4717E-5
+1.0617	-1.5001E-5
+1.0567	-1.5382E-5
+1.0517	-1.5721E-5
+1.0467	-1.6095E-5
+1.0417	-1.6406E-5
+1.0367	-1.6824E-5
+1.0317	-1.7172E-5
+1.0267	-1.7604E-5
+1.0217	-1.7968E-5
+1.0167	-1.8436E-5
+1.0117	-1.8861E-5
+1.0067	-1.9358E-5
+1.0017	-1.978E-5
+0.99673	-2.0897E-5
+0.99174	-2.1466E-5
+0.98673	-2.2024E-5
+0.98174	-2.2641E-5
+0.97673	-2.3258E-5
+0.97174	-2.3941E-5
+0.96672	-2.3961E-5
+0.96173	-2.4617E-5
+0.95671	-2.5403E-5
+0.95172	-2.6171E-5
+0.94671	-2.704E-5
+0.94173	-2.7864E-5
+0.93671	-2.8838E-5
+0.93172	-2.98E-5
+0.92673	-3.0857E-5
+0.92173	-3.1897E-5
+0.91672	-3.3118E-5
+0.91172	-3.431E-5
+0.90671	-3.5626E-5
+0.90173	-3.691E-5
+0.89672	-3.8356E-5
+0.89172	-3.9783E-5
+0.88672	-4.1316E-5
+0.88173	-4.2792E-5
+0.87672	-4.44E-5
+0.87172	-4.5948E-5
+0.86672	-4.7575E-5
+0.86172	-4.9136E-5
+0.85672	-5.0784E-5
+0.85172	-5.2412E-5
+0.84671	-5.4101E-5
+0.84172	-5.575E-5
+0.83671	-5.7523E-5
+0.83171	-5.9236E-5
+0.82671	-6.1016E-5
+0.82171	-6.2707E-5
+0.81671	-6.4494E-5
+0.81172	-6.6198E-5
+0.80671	-6.788E-5
+0.80172	-6.9455E-5
+0.79671	-7.1034E-5
+0.79171	-7.2475E-5
+0.78671	-7.3865E-5
+0.78171	-7.5044E-5
+0.7767	-7.6197E-5
+0.77171	-7.7167E-5
+0.7667	-7.802E-5
+0.76172	-7.8616E-5
+0.7567	-7.9143E-5
+0.75171	-7.9473E-5
+0.74671	-7.9664E-5
+0.74171	-7.9606E-5
+0.73671	-7.9467E-5
+0.73171	-7.915E-5
+0.72671	-7.8693E-5
+0.72171	-7.8022E-5
+0.7167	-7.7264E-5
+0.7117	-7.6377E-5
+0.70669	-7.5412E-5
+0.7017	-7.4273E-5
+0.6967	-7.3144E-5
+0.69171	-7.1916E-5
+0.6867	-7.0703E-5
+0.68171	-6.9404E-5
+0.6767	-6.8202E-5
+0.6717	-6.6996E-5
+0.6667	-6.5884E-5
+0.66171	-6.4802E-5
+0.65669	-6.3822E-5
+0.6517	-6.2849E-5
+0.6467	-6.1949E-5
+0.6417	-6.0977E-5
+0.63669	-5.9953E-5
+0.6317	-5.8722E-5
+0.62669	-5.7418E-5
+0.62169	-5.5873E-5
+0.61669	-5.4271E-5
+0.6117	-5.2496E-5
+0.60669	-5.07E-5
+0.6017	-4.876E-5
+0.59669	-4.699E-5
+0.5917	-4.5194E-5
+0.58669	-4.3532E-5
+0.58171	-4.1878E-5
+0.5767	-4.0441E-5
+0.5717	-3.9018E-5
+0.56669	-3.7759E-5
+0.56171	-3.6528E-5
+0.55669	-3.5483E-5
+0.5517	-3.4461E-5
+0.54669	-3.3558E-5
+0.5417	-3.2637E-5
+0.53669	-3.185E-5
+0.5317	-3.1022E-5
+0.52668	-3.0288E-5
+0.5217	-2.9491E-5
+0.5167	-2.8841E-5
+0.5117	-2.8144E-5
+0.50669	-2.7507E-5
+0.50169	-2.6799E-5
+0.4967	-2.622E-5
+0.49169	-2.5591E-5
+0.48669	-2.4999E-5
+0.48169	-2.4363E-5
+0.47668	-2.3831E-5
+0.47168	-2.3281E-5
+0.46667	-2.2799E-5
+0.46169	-2.2271E-5
+0.45669	-2.1838E-5
+0.45169	-2.137E-5
+0.44669	-2.1E-5
+0.44169	-2.0564E-5
+0.43668	-2.0245E-5
+0.4317	-1.9898E-5
+0.42669	-1.9656E-5
+0.42169	-1.9374E-5
+0.41668	-1.9207E-5
+0.41169	-1.9036E-5
+0.40669	-1.8957E-5
+0.40169	-1.8837E-5
+0.39668	-1.8836E-5
+0.39168	-1.8847E-5
+0.38668	-1.8964E-5
+0.38168	-1.904E-5
+0.37668	-1.9266E-5
+0.37169	-1.947E-5
+0.36668	-1.9792E-5
+0.36169	-2.0084E-5
+0.35667	-2.0579E-5
+0.35168	-2.1082E-5
+0.34667	-2.1725E-5
+0.34168	-2.2369E-5
+0.33667	-2.3203E-5
+0.33168	-2.4067E-5
+0.32667	-2.5099E-5
+0.32168	-2.6121E-5
+0.31666	-2.7409E-5
+0.31167	-2.8737E-5
+0.30667	-3.0254E-5
+0.30168	-3.1802E-5
+0.29666	-3.3593E-5
+0.29168	-3.5344E-5
+0.28667	-3.7187E-5
+0.28167	-3.8854E-5
+0.27667	-4.066E-5
+0.27168	-4.2282E-5
+0.26666	-4.3914E-5
+0.26168	-4.5409E-5
+0.25667	-4.6993E-5
+0.25168	-4.8514E-5
+0.24667	-5.0065E-5
+0.24167	-5.1485E-5
+0.23667	-5.3056E-5
+0.23166	-5.4561E-5
+0.22666	-5.6171E-5
+0.22167	-5.7714E-5
+0.21666	-5.9482E-5
+0.21167	-6.1281E-5
+0.20667	-6.3228E-5
+0.20167	-6.5113E-5
+0.19667	-6.7148E-5
+0.19167	-6.913E-5
+0.18667	-7.1168E-5
+0.18168	-7.3105E-5
+0.17667	-7.5177E-5
+0.17167	-7.7195E-5
+0.16666	-7.9279E-5
+0.16167	-8.1247E-5
+0.15666	-8.3201E-5
+0.15166	-8.4986E-5
+0.14666	-8.6526E-5
+0.14167	-8.754E-5
+0.13666	-8.8138E-5
+0.13167	-8.8106E-5
+0.12667	-8.748E-5
+0.12167	-8.6187E-5
+0.11666	-8.4619E-5
+0.11167	-8.2867E-5
+0.10666	-8.1285E-5
+0.10167	-7.9855E-5
+0.09667	-7.8791E-5
+0.09167	-7.7993E-5
+0.08667	-7.7463E-5
+0.08167	-7.7022E-5
+0.07666	-7.6844E-5
+0.07168	-7.6697E-5
+0.06666	-7.6689E-5
+0.06167	-7.6672E-5
+0.05666	-7.6973E-5
+0.05167	-7.7509E-5
+0.04667	-7.8565E-5
+0.04168	-8.0215E-5
+0.03667	-8.2941E-5
+0.03168	-8.7266E-5`;
+
+const EXAMPLE_N2 = `2.1111E-4	-3.1787E-4
+0.00362	-2.5716E-4
+0.00862	-1.8351E-4
+0.01363	-1.2638E-4
+0.01861	-8.4591E-5
+0.02363	-5.3054E-5
+0.02861	-2.965E-5
+0.03351	-1.3209E-5
+0.03862	-1.6263E-6
+0.04362	6.3315E-6
+0.04862	1.2149E-5
+0.05362	1.5928E-5
+0.05862	1.9026E-5
+0.06361	2.1017E-5
+0.06862	2.2512E-5
+0.07361	2.3615E-5
+0.07862	2.4499E-5
+0.08362	2.5128E-5
+0.08862	2.5701E-5
+0.09362	2.612E-5
+0.09862	2.6487E-5
+0.10361	2.6604E-5
+0.10861	2.7061E-5
+0.11362	2.7059E-5
+0.11861	2.7411E-5
+0.12362	2.7735E-5
+0.12862	2.8272E-5
+0.13361	2.8646E-5
+0.13861	2.8966E-5
+0.14361	2.9254E-5
+0.1486	2.9715E-5
+0.15363	3.0038E-5
+0.15861	2.9889E-5
+0.16361	2.995E-5
+0.16862	2.9854E-5
+0.17362	2.9828E-5
+0.17862	2.9608E-5
+0.18361	2.9628E-5
+0.18861	2.9713E-5
+0.19362	2.9695E-5
+0.19861	2.9468E-5
+0.20361	2.9591E-5
+0.20862	2.9712E-5
+0.21361	2.9594E-5
+0.21861	2.9094E-5
+0.22362	2.8648E-5
+0.2286	2.7933E-5
+0.23361	2.7252E-5
+0.23861	2.6489E-5
+0.24361	2.5517E-5
+0.24861	2.4578E-5
+0.25362	2.3678E-5
+0.25861	2.2972E-5
+0.26361	2.1954E-5
+0.2686	2.1135E-5
+0.27362	2.0257E-5
+0.27861	1.9317E-5
+0.28361	1.8215E-5
+0.28862	1.6966E-5
+0.29362	1.6107E-5
+0.29861	1.5042E-5
+0.30362	1.4024E-5
+0.30861	1.2845E-5
+0.31362	1.197E-5
+0.31862	1.0933E-5
+0.32363	1.0151E-5
+0.32863	9.1388E-6
+0.33363	8.4341E-6
+0.33863	7.6433E-6
+0.34363	7.1021E-6
+0.34863	6.363E-6
+0.35363	5.7973E-6
+0.35863	5.2636E-6
+0.36364	4.8208E-6
+0.36863	4.2257E-6
+0.37363	3.8259E-6
+0.37863	3.4973E-6
+0.38363	3.1545E-6
+0.38862	2.7669E-6
+0.39363	2.6038E-6
+0.39863	2.2726E-6
+0.40363	2.0907E-6
+0.40864	1.9798E-6
+0.41364	1.9442E-6
+0.41863	1.7998E-6
+0.42364	1.5499E-6
+0.42864	1.4044E-6
+0.43364	1.3931E-6
+0.43863	1.3267E-6
+0.44364	1.1651E-6
+0.44863	1.1717E-6
+0.45364	1.1989E-6
+0.45863	9.8033E-7
+0.46363	1.0325E-6
+0.46863	1.0128E-6
+0.47363	1.1671E-6
+0.47863	1.1765E-6
+0.48364	1.1425E-6
+0.48864	1.183E-6
+0.49364	1.2762E-6
+0.49864	1.3488E-6
+0.50363	1.3047E-6
+0.50863	1.4267E-6
+0.51364	1.4873E-6
+0.51864	1.5736E-6
+0.52364	1.6802E-6
+0.52864	1.8288E-6
+0.53364	1.7146E-6
+0.53864	1.934E-6
+0.54364	1.942E-6
+0.54864	2.0715E-6
+0.55364	2.1363E-6
+0.55864	2.2867E-6
+0.56365	2.4105E-6
+0.56864	2.4874E-6
+0.57365	2.4713E-6
+0.57865	2.562E-6
+0.58364	2.7959E-6
+0.58864	2.8101E-6
+0.59364	3.1881E-6
+0.59864	3.2918E-6
+0.60365	3.4393E-6
+0.60864	3.5636E-6
+0.61364	3.7818E-6
+0.61864	3.9794E-6
+0.62364	4.1305E-6
+0.62863	4.2496E-6
+0.63365	4.4335E-6
+0.63864	4.6522E-6
+0.64364	4.8048E-6
+0.64865	4.9324E-6
+0.65365	5.1676E-6
+0.65865	5.3533E-6
+0.66365	5.5593E-6
+0.66865	5.791E-6
+0.67365	6.0172E-6
+0.67864	6.3486E-6
+0.68365	6.652E-6
+0.68865	6.8452E-6
+0.69366	7.1894E-6
+0.69864	7.5146E-6
+0.70364	7.8745E-6
+0.70864	8.2495E-6
+0.71365	8.6293E-6
+0.71864	9.0028E-6
+0.72365	9.5415E-6
+0.72865	9.8933E-6
+0.73366	1.0327E-5
+0.73865	1.0823E-5
+0.74365	1.1222E-5
+0.74865	1.1601E-5
+0.75366	1.2083E-5
+0.75865	1.2544E-5
+0.76365	1.315E-5
+0.76865	1.3865E-5
+0.77366	1.4493E-5
+0.77864	1.5335E-5
+0.78365	1.6114E-5
+0.78865	1.6852E-5
+0.79366	1.7768E-5
+0.79864	1.8591E-5
+0.80366	1.9196E-5
+0.80865	2.0003E-5
+0.81366	2.0634E-5
+0.81865	2.1271E-5
+0.82365	2.1618E-5
+0.82865	2.227E-5
+0.83365	2.2694E-5
+0.83865	2.2875E-5
+0.84366	2.3097E-5
+0.84865	2.3395E-5
+0.85366	2.3511E-5
+0.85865	2.3581E-5
+0.86365	2.3469E-5
+0.86865	2.3492E-5
+0.87366	2.3364E-5
+0.87866	2.3321E-5
+0.88366	2.3376E-5
+0.88866	2.3254E-5
+0.89367	2.3133E-5
+0.89866	2.3336E-5
+0.90365	2.3475E-5
+0.90865	2.3507E-5
+0.91366	2.3707E-5
+0.91866	2.4072E-5
+0.92366	2.4206E-5
+0.92866	2.4424E-5
+0.93366	2.4877E-5
+0.93866	2.524E-5
+0.94366	2.5589E-5
+0.94865	2.5966E-5
+0.95366	2.6331E-5
+0.95866	2.6644E-5
+0.96367	2.7013E-5
+0.96867	2.7312E-5
+0.97368	2.7617E-5
+0.97868	2.781E-5
+0.98368	2.8039E-5
+0.98868	2.8214E-5
+0.99368	2.8371E-5
+0.99867	2.8565E-5
+1.0037	2.8766E-5
+1.0087	2.8909E-5
+1.0137	2.9109E-5
+1.0187	2.9236E-5
+1.0237	2.9355E-5
+1.0287	2.9623E-5
+1.0337	2.9746E-5
+1.0387	2.994E-5
+1.0437	3.0081E-5
+1.0487	3.0361E-5
+1.0537	3.0571E-5
+1.0587	3.0794E-5
+1.0637	3.1021E-5
+1.0687	3.1312E-5
+1.0737	3.161E-5
+1.0787	3.1835E-5
+1.0837	3.2129E-5
+1.0887	3.2509E-5
+1.0937	3.2766E-5
+1.0987	3.3053E-5
+1.1037	3.3379E-5
+1.1087	3.3703E-5
+1.1137	3.4045E-5
+1.1187	3.4415E-5
+1.1237	3.4729E-5
+1.1287	3.5073E-5
+1.1337	3.5412E-5
+1.1387	3.5777E-5
+1.1437	3.6073E-5
+1.1487	3.6438E-5
+1.1537	3.6708E-5
+1.1587	3.7013E-5
+1.1637	3.7392E-5
+1.1687	3.7658E-5
+1.1737	3.7935E-5
+1.1787	3.8248E-5
+1.1837	3.8499E-5
+1.1887	3.8776E-5
+1.1937	3.9009E-5
+1.1766	3.9762E-6
+1.1716	9.7753E-7
+1.1666	-1.6794E-6
+1.1616	-3.1889E-6
+1.1566	-4.699E-6
+1.1516	-5.9982E-6
+1.1466	-7.0634E-6
+1.1416	-8.0087E-6
+1.1366	-8.7936E-6
+1.1316	-9.5173E-6
+1.1266	-1.0535E-5
+1.1216	-1.0706E-5
+1.1166	-1.1213E-5
+1.1117	-1.1704E-5
+1.1067	-1.2136E-5
+1.1017	-1.2567E-5
+1.0967	-1.2955E-5
+1.0917	-1.3346E-5
+1.0867	-1.3714E-5
+1.0817	-1.4082E-5
+1.0767	-1.4411E-5
+1.0717	-1.4785E-5
+1.0667	-1.5121E-5
+1.0617	-1.5488E-5
+1.0567	-1.5828E-5
+1.0517	-1.6187E-5
+1.0467	-1.6548E-5
+1.0417	-1.6943E-5
+1.0367	-1.7291E-5
+1.0317	-1.7691E-5
+1.0267	-1.8091E-5
+1.0217	-1.8533E-5
+1.0167	-1.8952E-5
+1.0117	-1.9423E-5
+1.0067	-1.989E-5
+1.0017	-2.0414E-5
+0.99667	-2.0897E-5
+0.99167	-2.1466E-5
+0.98669	-2.2024E-5
+0.98168	-2.2641E-5
+0.97667	-2.3258E-5
+0.97167	-2.3941E-5
+0.96669	-2.4632E-5
+0.96168	-2.5381E-5
+0.95668	-2.6143E-5
+0.95169	-2.6954E-5
+0.94669	-2.7805E-5
+0.94168	-2.8689E-5
+0.93668	-2.9628E-5
+0.93169	-3.0599E-5
+0.92669	-3.1639E-5
+0.92169	-3.271E-5
+0.91669	-3.384E-5
+0.91169	-3.5032E-5
+0.90669	-3.6262E-5
+0.9017	-3.7556E-5
+0.89669	-3.8914E-5
+0.89169	-4.0325E-5
+0.8867	-4.1775E-5
+0.8817	-4.3311E-5
+0.87669	-4.487E-5
+0.8717	-4.6494E-5
+0.86669	-4.8185E-5
+0.86169	-4.9904E-5
+0.85669	-5.1653E-5
+0.8517	-5.3428E-5
+0.84669	-5.5248E-5
+0.8417	-5.711E-5
+0.8367	-5.8989E-5
+0.83171	-6.0864E-5
+0.82671	-6.2764E-5
+0.82171	-6.464E-5
+0.8167	-6.6505E-5
+0.81171	-6.834E-5
+0.80671	-7.0103E-5
+0.80171	-7.1821E-5
+0.79671	-7.3392E-5
+0.79173	-7.4933E-5
+0.78672	-7.6335E-5
+0.78172	-7.7631E-5
+0.77672	-7.8733E-5
+0.77174	-7.9717E-5
+0.76674	-8.0494E-5
+0.76174	-8.1119E-5
+0.75673	-8.1513E-5
+0.75173	-8.1755E-5
+0.74673	-8.1802E-5
+0.74174	-8.1693E-5
+0.73674	-8.1412E-5
+0.73175	-8.0998E-5
+0.72673	-8.044E-5
+0.72175	-7.9759E-5
+0.71672	-7.893E-5
+0.71173	-7.8025E-5
+0.70674	-7.6993E-5
+0.70174	-7.592E-5
+0.69673	-7.4744E-5
+0.69174	-7.3535E-5
+0.68673	-7.225E-5
+0.68174	-7.0969E-5
+0.67674	-6.9638E-5
+0.67174	-6.8347E-5
+0.66674	-6.7066E-5
+0.66174	-6.5859E-5
+0.65673	-6.4705E-5
+0.65174	-6.3643E-5
+0.64673	-6.2655E-5
+0.64174	-6.1792E-5
+0.63674	-6.1025E-5
+0.63175	-6.0356E-5
+0.62674	-5.9787E-5
+0.62174	-5.9293E-5
+0.61675	-5.8843E-5
+0.61175	-5.8353E-5
+0.60675	-5.7757E-5
+0.60175	-5.7027E-5
+0.59675	-5.6091E-5
+0.59175	-5.496E-5
+0.58675	-5.3641E-5
+0.58176	-5.2179E-5
+0.57674	-5.0618E-5
+0.57175	-4.903E-5
+0.56676	-4.7414E-5
+0.56175	-4.5844E-5
+0.55675	-4.4319E-5
+0.55174	-4.2873E-5
+0.54675	-4.1507E-5
+0.54175	-4.0231E-5
+0.53675	-3.9007E-5
+0.53176	-3.7855E-5
+0.52676	-3.6749E-5
+0.52177	-3.5701E-5
+0.51675	-3.4678E-5
+0.51177	-3.3707E-5
+0.50676	-3.2752E-5
+0.50176	-3.1837E-5
+0.49676	-3.0932E-5
+0.49176	-3.0083E-5
+0.48675	-2.9239E-5
+0.48176	-2.8462E-5
+0.47677	-2.7678E-5
+0.47177	-2.6933E-5
+0.46677	-2.6185E-5
+0.46178	-2.5476E-5
+0.45677	-2.4774E-5
+0.45178	-2.4105E-5
+0.44678	-2.3469E-5
+0.44178	-2.2875E-5
+0.43678	-2.2311E-5
+0.43179	-2.1793E-5
+0.42678	-2.1292E-5
+0.42179	-2.0851E-5
+0.41678	-2.0447E-5
+0.41179	-2.0105E-5
+0.40678	-1.9805E-5
+0.40179	-1.9563E-5
+0.39678	-1.9343E-5
+0.39179	-1.9204E-5
+0.38678	-1.9119E-5
+0.38179	-1.913E-5
+0.37678	-1.9162E-5
+0.37178	-1.9312E-5
+0.36679	-1.9471E-5
+0.36179	-1.9711E-5
+0.35678	-1.9991E-5
+0.35179	-2.0414E-5
+0.34679	-2.0907E-5
+0.3418	-2.1501E-5
+0.33679	-2.215E-5
+0.3318	-2.294E-5
+0.32678	-2.3835E-5
+0.32179	-2.4898E-5
+0.31679	-2.6081E-5
+0.3118	-2.7454E-5
+0.30678	-2.8969E-5
+0.3018	-3.0631E-5
+0.29679	-3.2454E-5
+0.29179	-3.4374E-5
+0.28679	-3.6368E-5
+0.2818	-3.8434E-5
+0.27679	-4.0499E-5
+0.2718	-4.2598E-5
+0.2668	-4.467E-5
+0.2618	-4.6691E-5
+0.2568	-4.8665E-5
+0.2518	-5.0602E-5
+0.24679	-5.2507E-5
+0.2418	-5.4478E-5
+0.23679	-5.6408E-5
+0.2318	-5.8391E-5
+0.22679	-6.0381E-5
+0.2218	-6.2413E-5
+0.2168	-6.4434E-5
+0.2118	-6.653E-5
+0.20681	-6.8693E-5
+0.2018	-7.097E-5
+0.1968	-7.3359E-5
+0.19181	-7.5989E-5
+0.18681	-7.8855E-5
+0.18181	-8.2234E-5
+0.1768	-8.6017E-5
+0.17181	-9.0409E-5
+0.16681	-9.5343E-5
+0.16206	-1.0051E-4
+0.15682	-1.0621E-4
+0.15183	-1.1226E-4
+0.14681	-1.1797E-4
+0.14182	-1.2339E-4
+0.13682	-1.2829E-4
+0.13183	-1.3271E-4
+0.12683	-1.361E-4
+0.12184	-1.3789E-4
+0.11682	-1.3723E-4
+0.11183	-1.343E-4
+0.10683	-1.2971E-4
+0.10183	-1.2421E-4
+0.09683	-1.1856E-4
+0.09183	-1.135E-4
+0.08682	-1.0904E-4
+0.08184	-1.0545E-4
+0.07682	-1.0221E-4
+0.07183	-9.933E-5
+0.06683	-9.6773E-5
+0.06184	-9.4836E-5
+0.05682	-9.3424E-5
+0.05184	-9.2718E-5
+0.04683	-9.2968E-5
+0.04184	-9.4625E-5
+0.03683	-9.7942E-5
+0.03184	-1.0396E-4`;
+
+const EXAMPLE_O2 = `0.00104	-0.00122
+0.00464	-0.00116
+0.0098	-0.00112
+0.01488	-0.00109
+0.02006	-0.00108
+0.02519	-0.00107
+0.03061	-0.00107
+0.03563	-0.00107
+0.04078	-0.00108
+0.04597	-0.00108
+0.05107	-0.00109
+0.0563	-0.0011
+0.06115	-0.0011
+0.06668	-0.0011
+0.0716	-0.00111
+0.07674	-0.00111
+0.08191	-0.00111
+0.08712	-0.00112
+0.09245	-0.00112
+0.09759	-0.00112
+0.10267	-0.00112
+0.10774	-0.00112
+0.11295	-0.00112
+0.11808	-0.00112
+0.12329	-0.00112
+0.1284	-0.00112
+0.13355	-0.00113
+0.13855	-0.00113
+0.14389	-0.00113
+0.14901	-0.00113
+0.1543	-0.00113
+0.15952	-0.00113
+0.16456	-0.00113
+0.16965	-0.00113
+0.17476	-0.00113
+0.1799	-0.00113
+0.18519	-0.00113
+0.19034	-0.00114
+0.1954	-0.00113
+0.20052	-0.00114
+0.20563	-0.00113
+0.2109	-0.00114
+0.21596	-0.00114
+0.22127	-0.00114
+0.22639	-0.00114
+0.23173	-0.00114
+0.23696	-0.00115
+0.2419	-0.00115
+0.24704	-0.00115
+0.25213	-0.00115
+0.25711	-0.00115
+0.26238	-0.00115
+0.26737	-0.00115
+0.27268	-0.00115
+0.27792	-0.00115
+0.28306	-0.00115
+0.28821	-0.00115
+0.29345	-0.00116
+0.2985	-0.00116
+0.30377	-0.00116
+0.30896	-0.00116
+0.31408	-0.00116
+0.31927	-0.00116
+0.32403	-0.00115
+0.32956	-0.00116
+0.33459	-0.00116
+0.33988	-0.00116
+0.34502	-0.00117
+0.35013	-0.00116
+0.35545	-0.00117
+0.36035	-0.00116
+0.36566	-0.00116
+0.37052	-0.00116
+0.37571	-0.00116
+0.38103	-0.00116
+0.38626	-0.00117
+0.39142	-0.00117
+0.39647	-0.00116
+0.40182	-0.00117
+0.40703	-0.00117
+0.4121	-0.00117
+0.41701	-0.00116
+0.42233	-0.00117
+0.4275	-0.00116
+0.43262	-0.00116
+0.4376	-0.00116
+0.44315	-0.00117
+0.44801	-0.00117
+0.45299	-0.00116
+0.45835	-0.00116
+0.46346	-0.00116
+0.46859	-0.00116
+0.47384	-0.00116
+0.47867	-0.00116
+0.48391	-0.00116
+0.48937	-0.00116
+0.49453	-0.00116
+0.49957	-0.00117
+0.50472	-0.00116
+0.51009	-0.00116
+0.51521	-0.00116
+0.52021	-0.00116
+0.52539	-0.00116
+0.53052	-0.00116
+0.53571	-0.00116
+0.54087	-0.00116
+0.54622	-0.00116
+0.55131	-0.00116
+0.55643	-0.00116
+0.56142	-0.00116
+0.56658	-0.00116
+0.57171	-0.00116
+0.57681	-0.00115
+0.58206	-0.00116
+0.58691	-0.00115
+0.59249	-0.00116
+0.59775	-0.00116
+0.60294	-0.00116
+0.60811	-0.00116
+0.61279	-0.00115
+0.61806	-0.00115
+0.62316	-0.00115
+0.62861	-0.00116
+0.63373	-0.00115
+0.63893	-0.00116
+0.64408	-0.00115
+0.64918	-0.00115
+0.65414	-0.00115
+0.65968	-0.00115
+0.66463	-0.00115
+0.66976	-0.00115
+0.67489	-0.00115
+0.67972	-0.00114
+0.68499	-0.00114
+0.6907	-0.00115
+0.69565	-0.00114
+0.70085	-0.00114
+0.70577	-0.00115
+0.71118	-0.00114
+0.71648	-0.00114
+0.72135	-0.00114
+0.72667	-0.00114
+0.73184	-0.00114
+0.7366	-0.00113
+0.74188	-0.00113
+0.74717	-0.00113
+0.75235	-0.00113
+0.75749	-0.00113
+0.76266	-0.00112
+0.76792	-0.00113
+0.77274	-0.00112
+0.77789	-0.00111
+0.78338	-0.00112
+0.78844	-0.00112
+0.79344	-0.00111
+0.7988	-0.00111
+0.80399	-0.00111
+0.80889	-0.0011
+0.81426	-0.0011
+0.81944	-0.00109
+0.82426	-0.00108
+0.82972	-0.00109
+0.8348	-0.00108
+0.83985	-0.00107
+0.84508	-0.00106
+0.8502	-0.00105
+0.85523	-0.00103
+0.86045	-0.00103
+0.86571	-0.00101
+0.87086	-9.8499E-4
+0.87601	-9.6194E-4
+0.881	-9.3016E-4
+0.88626	-9.0367E-4
+0.89153	-8.6305E-4
+0.89663	-8.1797E-4
+0.90168	-7.6944E-4
+0.90701	-7.1718E-4
+0.91204	-6.5888E-4
+0.91708	-5.9999E-4
+0.92242	-5.3649E-4
+0.92755	-4.7735E-4
+0.93257	-4.1297E-4
+0.93793	-3.5534E-4
+0.94297	-3.0063E-4
+0.94804	-2.4934E-4
+0.9533	-2.0442E-4
+0.95838	-1.636E-4
+0.96363	-1.2919E-4
+0.96886	-9.9175E-5
+0.97391	-7.3898E-5
+0.97901	-5.3411E-5
+0.98422	-3.5989E-5
+0.98932	-2.1728E-5
+0.99448	-1.0819E-5
+0.99964	-1.8079E-6
+1.0047	5.6835E-6
+1.0098	1.1251E-5
+1.0149	1.5682E-5
+1.0201	1.9376E-5
+1.0253	2.2521E-5
+1.0304	2.4832E-5
+1.0356	2.6286E-5
+1.0407	2.8304E-5
+1.0459	2.9386E-5
+1.0511	3.0289E-5
+1.0563	3.1524E-5
+1.0614	3.1955E-5
+1.0666	3.2575E-5
+1.0718	3.3556E-5
+1.077	3.3364E-5
+1.0822	3.4038E-5
+1.0874	3.458E-5
+1.0925	3.4384E-5
+1.0976	3.5058E-5
+1.1028	3.5492E-5
+1.1079	3.5871E-5
+1.1131	3.6183E-5
+1.1184	3.6131E-5
+1.1234	3.6445E-5
+1.1286	3.6937E-5
+1.1338	3.7154E-5
+1.1389	3.7702E-5
+1.1442	3.7703E-5
+1.1493	3.7828E-5
+1.1544	3.8402E-5
+1.1596	3.8545E-5
+1.1648	3.8661E-5
+1.1699	3.9273E-5
+1.1751	3.9466E-5
+1.1802	3.9707E-5
+1.1854	3.9887E-5
+1.1905	4.0574E-5
+1.1957	4.0588E-5`;
+
+function loadExampleData() {
+  $("cvText").value = EXAMPLE_CV;
+  $("n2Text").value = EXAMPLE_N2;
+  $("lsvText").value = EXAMPLE_O2;
+  $("cvPotUnit").value = "V";
+  $("cvCurUnit").value = "A";
+  $("o2PotUnit").value = "V";
+  $("o2CurUnit").value = "A";
+  $("n2CurUnit").value = "A";
+}
+
+
+/* ===== Units ===== */
+function unitFactor(u){
+  if (u === "uV" || u === "uA") return 1e-6;
+  if (u === "mV" || u === "mA") return 1e-3;
+  return 1.0;
+}
+function scanRateV(){
+  const v = num("vrate"); if (isNaN(v)) return NaN;
+  return $("vUnit").value === "mV/s" ? v / 1000 : v;
+}
+function qspecCmC(){
+  const v = num("qspec"); if (isNaN(v)) return NaN;
+  return $("qUnit").value === "uC/cm\u00B2" ? v / 1000 : v;
+}
+
+/* ===== Pt Loading ===== */
+function computePtLoad(){
+  const c = num("inkConc"), vd = num("dropVol"), A = num("area"), f = num("ptFrac");
+  if (isNaN(c) || isNaN(vd) || isNaN(A) || A === 0 || isNaN(f)) {
+    $("ptLoad").value = ""; return NaN;
+  }
+  const tot = c * vd / A;
+  const p = tot * f / 100;
+  $("ptLoad").value = p.toFixed(4);
+  return p;
+}
+
+/* ===== Parse ===== */
+function parse2col(txt, potU, curU){
+  const pf = unitFactor(potU), cf = unitFactor(curU);
+  const rows = [];
+  for (const line of txt.split(/\r?\n/)){
+    const s = line.trim(); if (!s || s.startsWith("#")) continue;
+    const parts = s.split(/[\s,;\t]+/).map(Number).filter(x => !isNaN(x));
+    if (parts.length >= 2) rows.push([parts[0]*pf, parts[1]*cf]);
+  }
+  return rows;
+}
+
+/* ===== Interpolation ===== */
+function interp(xq, xs, ys){
+  const n = xs.length; if (n === 0) return NaN;
+  const xmin = Math.min(xs[0], xs[n-1]), xmax = Math.max(xs[0], xs[n-1]);
+  const asc = xs[0] <= xs[n-1];
+  if (xq <= xmin) return asc ? ys[0] : ys[n-1];
+  if (xq >= xmax) return asc ? ys[n-1] : ys[0];
+  for (let i = 1; i < n; i++){
+    const a = xs[i-1], b = xs[i];
+    if (Math.min(a,b) <= xq && xq <= Math.max(a,b)){
+      const t = (xq - a) / (b - a || 1);
+      return ys[i-1] + t * (ys[i] - ys[i-1]);
+    }
+  }
+  return ys[n-1];
+}
+
+/* ===== Savitzky-Golay smoothing (window win, 2nd-order polynomial) ===== */
+function sgSmooth(y, win){
+  if (win < 3 || win % 2 === 0) win = 5;
+  const n = y.length, half = (win - 1) >> 1;
+  const out = y.slice();
+  const m = (win - 1) >> 1;
+  let sx = 0, sx2 = 0, sx3 = 0, sx4 = 0;
+  for (let i = -m; i <= m; i++){ sx += i; sx2 += i*i; sx3 += i*i*i; sx4 += i*i*i*i; }
+  const s0 = win, s1 = sx, s2 = sx2, s3 = sx3, s4 = sx4;
+  const det = s0*(s2*s4 - s3*s3) - s1*(s1*s4 - s2*s3) + s2*(s1*s3 - s2*s2);
+  if (Math.abs(det) < 1e-30) return out;
+  const c0 = (s2*s4 - s3*s3) / det;
+  const c2 = (s0*s4 - s2*s2) / det;
+  for (let i = 0; i < n; i++){
+    let sum = 0;
+    for (let j = -m; j <= m; j++){
+      const k = Math.min(Math.max(i + j, 0), n - 1);
+      sum += y[k] * (c0 + c2 * j * j);
+    }
+    out[i] = sum;
+  }
+  return out;
+}
+
+/* ===== Split Sweeps ===== */
+function splitSweeps(X, Y){
+  const segs = []; let start = 0;
+  for (let i = 1; i < X.length; i++){
+    if ((X[i]-X[i-1]) * (X[i-1]-X[start]) < 0 && (X[i]-X[i-1]) !== 0){
+      segs.push([X.slice(start, i+1), Y.slice(start, i+1)]);
+      start = i;
+    }
+  }
+  segs.push([X.slice(start), Y.slice(start)]);
+  return segs;
+}
+
+/* ===== SVG Chart ===== */
+function svgChart(el, series, opt){
+  opt = opt || {};
+  const W = 540, H = 300, pad = {l:54, r:16, t:28, b:40};
+  let xs = [], ys = [];
+  series.forEach(s => s.x.forEach((v,i) => { xs.push(v); ys.push(s.y[i]); }));
+  (opt.markers||[]).forEach(m => { xs.push(m.x); ys.push(m.y); });
+  (opt.regions||[]).forEach(r => { xs.push(r.x0); xs.push(r.x1); });
+  let xmin = Math.min(...xs), xmax = Math.max(...xs);
+  let ymin = Math.min(...ys), ymax = Math.max(...ys);
+  if (opt.ymin !== undefined) ymin = opt.ymin;
+  if (opt.ymax !== undefined) ymax = opt.ymax;
+  if (xmin === xmax) xmax = xmin + 1;
+  if (ymin === ymax) ymax = ymin + 1;
+  const ypad = (ymax - ymin) * 0.08; ymin -= ypad; ymax += ypad;
+  const X = v => pad.l + (v - xmin)/(xmax - xmin) * (W - pad.l - pad.r);
+  const Y = v => H - pad.b - (v - ymin)/(ymax - ymin) * (H - pad.t - pad.b);
+  let s = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" style="background:#fff;">`;
+  s += `<text x="${W/2}" y="18" text-anchor="middle" font-size="12" fill="#1d1d1f" font-weight="600">${opt.title||""}</text>`;
+  s += `<line x1="${pad.l}" y1="${H-pad.b}" x2="${W-pad.r}" y2="${H-pad.b}" stroke="#d2d2d7"/>`;
+  s += `<line x1="${pad.l}" y1="${pad.t}" x2="${pad.l}" y2="${H-pad.b}" stroke="#d2d2d7"/>`;
+  for (let k=0;k<=3;k++){ const v=ymin+(ymax-ymin)*k/3, y=Y(v);
+    s += `<line x1="${pad.l}" y1="${y}" x2="${W-pad.r}" y2="${y}" stroke="#f0f0f2"/>`;
+    s += `<text x="${pad.l-6}" y="${y+3}" text-anchor="end" font-size="10" fill="#6e6e73">${v.toFixed(2)}</text>`; }
+  for (let k=0;k<=4;k++){ const v=xmin+(xmax-xmin)*k/4, x=X(v);
+    s += `<line x1="${x}" y1="${pad.t}" x2="${x}" y2="${H-pad.b}" stroke="#f0f0f2"/>`;
+    s += `<text x="${x}" y="${H-pad.b+14}" text-anchor="middle" font-size="10" fill="#6e6e73">${v.toFixed(2)}</text>`; }
+  s += `<text x="${W/2}" y="${H-4}" text-anchor="middle" font-size="11" fill="#424245">${opt.xlabel||"E (V)"}</text>`;
+  s += `<text x="12" y="${H/2}" text-anchor="middle" font-size="11" fill="#424245" transform="rotate(-90 12 ${H/2})">${opt.ylabel||"J (mA/cm\u00B2)"}</text>`;
+  (opt.regions||[]).forEach(r => {
+    const x0 = X(r.x0), x1 = X(r.x1);
+    s += `<rect x="${Math.min(x0,x1)}" y="${pad.t}" width="${Math.abs(x1-x0)}" height="${H-pad.b-pad.t}" fill="${r.color||"#0071e3"}" opacity="0.10"/>`;
+  });
+  (opt.fills||[]).forEach(f => {
+    const pts = f.x.map((v,i)=>`${X(v).toFixed(1)},${Y(f.y[i]).toFixed(1)}`).join(" ");
+    const base = f.base.slice().reverse().map((v,i)=>`${X(f.x[f.base.length-1-i]).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
+    s += `<polygon points="${pts} ${base}" fill="${f.color||"#0071e3"}" opacity="0.22"/>`;
+  });
+  series.forEach(se => {
+    if (se.dashed){
+      const pts = se.x.map((v,i)=>`${X(v).toFixed(1)},${Y(se.y[i]).toFixed(1)}`).join(" ");
+      s += `<polyline points="${pts}" fill="none" stroke="${se.color}" stroke-width="1.2" stroke-dasharray="4,3"/>`;
+    } else {
+      const pts = se.x.map((v,i)=>`${X(v).toFixed(1)},${Y(se.y[i]).toFixed(1)}`).join(" ");
+      s += `<polyline points="${pts}" fill="none" stroke="${se.color}" stroke-width="1.5"/>`;
+    }
+  });
+  (opt.markers||[]).forEach(m => {
+    s += `<circle cx="${X(m.x).toFixed(1)}" cy="${Y(m.y).toFixed(1)}" r="4" fill="${m.color||"#d70015"}"><title>${m.label||""}</title></circle>`;
+  });
+  s += `</svg>`;
+  el.innerHTML = s;
+}
+function getSVG(el){ return el.querySelector("svg"); }
+
+/* ===== ECSA Calculation ===== */
+let lastAnodicSweep = null;
+let lastFullCycle = null;
+
+function calcECSA(){
+  const A = num("area"); if (isNaN(A)) return;
+  const v = scanRateV(), q = qspecCmC(), m = computePtLoad();
+  if (isNaN(v) || v === 0 || isNaN(q) || isNaN(m) || m === 0){
+    ["o_SH","o_QH","o_ecsa","o_ecsa_cm2","o_rf"].forEach(id => $(id).textContent = "\u2014");
+    updateSummary(); return;
+  }
+  const rows = parse2col($("cvText").value, $("cvPotUnit").value, $("cvCurUnit").value);
+  if (rows.length < 2){
+    ["o_SH","o_QH","o_ecsa","o_ecsa_cm2","o_rf"].forEach(id => $(id).textContent = "\u2014");
+    updateSummary(); return;
+  }
+  const X = rows.map(r => r[0]);
+  const I = rows.map(r => r[1]);
+  const J = I.map(i => i * 1000 / A);
+  lastFullCycle = { X, Y: J };
+
+  const lo = num("hlo"), hi = num("hhi");
+  if (isNaN(lo) || isNaN(hi) || lo >= hi){
+    $("cvMsg").textContent = "Hupd range is invalid."; return;
+  }
+  const segs = splitSweeps(X, J);
+  const anodic = segs.filter(([sx, sy]) =>
+    sx.length >= 2 && sx[sx.length-1] > sx[0] &&
+    sx.some((x, i) => x >= lo && x <= hi && sy[i] > 0)
+  ).pop();
+  if (!anodic){
+    $("cvMsg").textContent = "No stable sweep segment with a forward Hupd desorption peak was identified.";
+    return;
+  }
+  lastAnodicSweep = anodic;
+  const [sx, sy] = anodic;
+  const pts = sx.map((x, i) => [x, sy[i]]).filter(([x, y]) => x >= lo && x <= hi && y > 0);
+  if (pts.length < 2){
+    $("cvMsg").textContent = "Insufficient positive current data for the Hupd peak."; return;
+  }
+  pts.sort((a, b) => a[0] - b[0]);
+  const px = pts.map(p => p[0]), py = pts.map(p => p[1]);
+  const mode = $("baselineMode").value;
+  let j_bg;
+  if (mode === "manual"){
+    const b = parseFloat($("baseline").value);
+    j_bg = isNaN(b) ? py[py.length - 1] : b;
+  } else {
+    j_bg = py[py.length - 1];
+  }
+  let area = 0;
+  for (let i = 1; i < px.length; i++){
+    area += (px[i] - px[i-1]) * ((py[i-1] - j_bg) + (py[i] - j_bg)) / 2;
+  }
+  const SH = Math.abs(area);
+  const QH = SH / v;
+  const ecsa_m2g = 100 * SH / (q * v * m);
+  const ecsa_cm2 = QH * A / q;
+  const rf = ecsa_cm2 / A;
+  $("o_SH").textContent = fmt(SH, 5);
+  $("o_QH").textContent = fmt(QH, 4);
+  $("o_ecsa").textContent = fmt(ecsa_m2g, 2);
+  $("o_ecsa_cm2").textContent = fmt(ecsa_cm2, 3);
+  $("o_rf").textContent = fmt(rf, 2);
+  $("cvMsg").textContent = `S_H = ${SH.toFixed(5)} mA\u00B7V/cm\u00B2; baseline j_bg = ${j_bg.toFixed(5)} mA/cm\u00B2 (last positive current point in range).`;
+  updateSummary();
+  drawCvPlots(lo, hi, px, py, j_bg);
+}
+
+/* ===== Plotting ===== */
+function drawCvPlots(lo, hi, px, py, j_bg){
+  if (!lastFullCycle){
+    $("cvPlotFull").innerHTML = "";
+    $("cvPlotZoom").innerHTML = "";
+    return;
+  }
+  svgChart($("cvPlotFull"), [
+    { x: lastFullCycle.X, y: lastFullCycle.Y, color: "#1d1d1f" }
+  ], {
+    title: "CV \u00B7 Full Cycle", xlabel: "E (V vs RHE)", ylabel: "J (mA/cm\u00B2)",
+    regions: [{ x0: lo, x1: hi, color: "#0071e3" }]
+  });
+  const baselineY = px.map(() => j_bg);
+  svgChart($("cvPlotZoom"), [
+    { x: px, y: py, color: "#0071e3" },
+    { x: px, y: baselineY, color: "#d70015", dashed: true }
+  ], {
+    title: "Hupd Peak \u00B7 Baseline-subtracted Area", xlabel: "E (V vs RHE)", ylabel: "J (mA/cm\u00B2)",
+    fills: [{ x: px, y: py, base: baselineY, color: "#00875a" }]
+  });
+}
+
+/* ===== ORR ===== */
+function calcORR(){
+  const jE = num("jE"), jl = num("jlim"), m = computePtLoad();
+  if (isNaN(jE) || isNaN(jl) || isNaN(m) || m === 0){
+    ["o_jk","o_ma","o_sa"].forEach(id => $(id).textContent = "\u2014");
+    updateSummary(); return;
+  }
+  const jlabs = Math.abs(jl);
+  let jk = NaN;
+  if (jlabs > Math.abs(jE)) jk = Math.abs(jE) * jlabs / (jlabs - Math.abs(jE));
+  const ma = jk / 1000 / (m / 1000);
+  const v = scanRateV(), q = qspecCmC();
+  const SHt = parseFloat($("o_SH").textContent);
+  let ecsa_m2g = NaN;
+  if (!(isNaN(v) || isNaN(q) || isNaN(m) || isNaN(SHt))) ecsa_m2g = 100 * SHt / (q * v * m);
+  const sa = isNaN(ecsa_m2g) ? NaN : jk / (ecsa_m2g * (m/1e6) * 10000);
+  $("o_jk").textContent = fmt(jk, 3);
+  $("o_ma").textContent = fmt(ma, 4);
+  $("o_sa").textContent = fmt(sa, 3);
+  updateSummary();
+}
+
+/* ===== Summary ===== */
+function updateSummary(){
+  const ecsa = parseFloat($("o_ecsa").textContent);
+  const ma = parseFloat($("o_ma").textContent);
+  const sa = parseFloat($("o_sa").textContent);
+  $("sumEcsa").textContent = isNaN(ecsa) ? "\u2014" : ecsa.toFixed(2);
+  $("sumMa").textContent = isNaN(ma) ? "\u2014" : ma.toFixed(3);
+  $("sumSa").textContent = isNaN(sa) ? "\u2014" : sa.toFixed(3);
+}
+
+/* ===== LSV ===== */
+let lsvResult = null;
+$("lsvBtn").addEventListener("click", () => {
+  const A = num("area"); if (isNaN(A)){ $("lsvMsg").textContent = "RDE area not provided"; return; }
+  const o2 = parse2col($("lsvText").value, $("o2PotUnit").value, $("o2CurUnit").value);
+  if (o2.length < 2){ $("lsvMsg").textContent = "Insufficient O\u2082 data"; return; }
+  const o2s = o2.slice().sort((a,b)=>a[0]-b[0]);
+  const X = o2s.map(r => r[0]);
+  const Y = o2s.map(r => r[1] * 1000 / A);
+  let corrected = Y;
+  const n2txt = $("n2Text").value.trim();
+  if (n2txt){
+    const n2 = parse2col(n2txt, $("o2PotUnit").value, $("n2CurUnit").value);
+    if (n2.length >= 2){
+      const n2s = n2.slice().sort((a,b)=>a[0]-b[0]);
+      const nX = n2s.map(r => r[0]);
+      const nY = n2s.map(r => r[1] * 1000 / A);
+      corrected = Y.map((y, i) => y - interp(X[i], nX, nY));
+    }
+  }
+  // Savitzky-Golay smoothing (window 7, 2nd-order) to reduce N₂-correction noise
+  corrected = sgSmooth(corrected, 7);
+  const jlimE = num("jlimE");
+  const jlim = !isNaN(jlimE) ? interp(jlimE, X, corrected) : Math.min(...corrected);
+  const E = num("Ep");
+  const jE = !isNaN(E) ? interp(E, X, corrected) : NaN;
+  $("jlim").value = Math.abs(jlim).toFixed(4);
+  if (!isNaN(jE)) $("jE").value = jE.toFixed(4);
+  $("lsvMsg").textContent = `j_lim@${isNaN(jlimE)?"min":jlimE.toFixed(2)}V = ${jlim.toFixed(3)} mA/cm\u00B2, ` +
+    (isNaN(jE)?"":`j@${E.toFixed(2)}V = ${jE.toFixed(3)} mA/cm\u00B2, `) + (n2txt ? "N\u2082-corrected." : "No N\u2082 correction.");
+  calcORR();
+  lsvResult = { X, Y: corrected };
+  const mk = [];
+  if (!isNaN(jlimE)) mk.push({ x: jlimE, y: jlim, color: "#d70015", label: "j_lim" });
+  if (!isNaN(E)) mk.push({ x: E, y: jE, color: "#0071e3", label: "j@E" });
+  svgChart($("lsvPlot"), [{ x: X, y: corrected, color: "#00875a" }], {
+    title: "LSV (N\u2082-corrected)", xlabel: "E (V vs RHE)", ylabel: "J (mA/cm\u00B2)",
+    markers: mk, ymin: -6
+  });
+  $("lsvPlot").style.display = "block";
+});
+
+/* ===== Clear ===== */
+$("cvClear").addEventListener("click", () => {
+  $("cvText").value = ""; $("baseline").value = "";
+  ["o_SH","o_QH","o_ecsa","o_ecsa_cm2","o_rf"].forEach(id => $(id).textContent = "\u2014");
+  $("cvMsg").textContent = "Cleared.";
+  $("cvPlotFull").innerHTML = ""; $("cvPlotZoom").innerHTML = "";
+  updateSummary();
+});
+$("lsvClear").addEventListener("click", () => {
+  $("lsvText").value = ""; $("n2Text").value = "";
+  $("jE").value = ""; $("jlim").value = "";
+  $("lsvMsg").textContent = "Cleared.";
+  $("lsvPlot").style.display = "none";
+  ["o_jk","o_ma","o_sa"].forEach(id => $(id).textContent = "\u2014");
+  updateSummary();
+});
+
+/* ===== Export PNG ===== */
+function exportPNG(el, filename){
+  const svg = getSVG(el); if (!svg){ alert("Please generate the plot first."); return; }
+  const xml = new XMLSerializer().serializeToString(svg);
+  const svg64 = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(xml)));
+  const img = new Image();
+  img.onload = () => {
+    const scale = 2;
+    const canvas = document.createElement("canvas");
+    canvas.width = 540 * scale; canvas.height = 300 * scale;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#fff"; ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob(blob => {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+    });
+  };
+  img.src = svg64;
+}
+$("cvPng").addEventListener("click", () => exportPNG($("cvPlotFull"), "CV_full_cycle.png"));
+$("lsvPng").addEventListener("click", () => exportPNG($("lsvPlot"), "LSV_ORR.png"));
+
+/* ===== Export CSV ===== */
+$("exportCsv").addEventListener("click", () => {
+  const rows = [];
+  const push = (k, v) => rows.push([k, v]);
+  push("Standard", "GB/T 20042.4-2025");
+  push("Scan rate v (V/s)", scanRateV());
+  push("q_spec (mC/cm\u00B2)", qspecCmC());
+  push("Ink concentration (mg/mL)", $("inkConc").value);
+  push("Drop volume (\u00B5L)", $("dropVol").value);
+  push("Pt weight fraction (%)", $("ptFrac").value);
+  push("RDE area (cm\u00B2)", $("area").value);
+  push("Pt loading (\u00B5g/cm\u00B2)", $("ptLoad").value);
+  push("Hupd lower limit (V)", $("hlo").value);
+  push("Hupd upper limit (V)", $("hhi").value);
+  push("Baseline mode", $("baselineMode").value);
+  push("Evaluation potential E (V)", $("Ep").value);
+  push("j_lim evaluation potential (V)", $("jlimE").value);
+  push("j @ E (mA/cm\u00B2)", $("jE").value);
+  push("j_lim (mA/cm\u00B2)", $("jlim").value);
+  push("S_H (mA*V/cm\u00B2)", $("o_SH").textContent);
+  push("Q_H (mC/cm\u00B2)", $("o_QH").textContent);
+  push("ECSA (m\u00B2/gPt)", $("o_ecsa").textContent);
+  push("ECSA (cm\u00B2)", $("o_ecsa_cm2").textContent);
+  push("RF", $("o_rf").textContent);
+  push("j_k (mA/cm\u00B2)", $("o_jk").textContent);
+  push("MA (A/mgPt)", $("o_ma").textContent);
+  push("SA (mA/cm\u00B2Pt)", $("o_sa").textContent);
+  const csv = "\uFEFF" + rows.map(r => `"${r[0]}","${r[1]}"`).join("\r\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = "ECSA_MA_results.csv"; a.click();
+});
+
+/* ===== Linkage ===== */
+["vrate","vUnit","qspec","qUnit","inkConc","dropVol","ptFrac","area","hlo","hhi","baselineMode","baseline","cvPotUnit","cvCurUnit"].forEach(id =>
+  $(id).addEventListener("input", () => { computePtLoad(); calcECSA(); calcORR(); }));
+["jE","jlim","Ep","jlimE"].forEach(id => $(id).addEventListener("input", calcORR));
+document.querySelectorAll(".frac-tag").forEach(b =>
+  b.addEventListener("click", () => {
+    $("ptFrac").value = b.dataset.f;
+    document.querySelectorAll(".frac-tag").forEach(x => x.classList.toggle("active", x === b));
+    computePtLoad(); calcECSA(); calcORR();
+  }));
+
+$("cvBtn").addEventListener("click", calcECSA);
+$("cvText").addEventListener("input", () => { });
+$("loadExample").addEventListener("click", loadExampleData);
+
+/* Initialize */
+document.querySelector('.frac-tag[data-f="30"]').classList.add("active");
+</script>
+</body>
+</html>
