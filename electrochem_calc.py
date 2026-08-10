@@ -115,4 +115,61 @@ def half_wave_potential(E, j) -> float:
 # 5) Koutecký–Levich 动力学电流
 # ----------------------------------------------------------------------
 def koutecky_levich(j, j_lim) -> np.ndarray:
-    """由实测电流 j 与扩散极限电流 j_lim 
+    """由实测电流 j 与扩散极限电流 j_lim 求动力学电流（Koutecký–Levich）。
+
+        j_k = |j|·|j_lim| / (|j_lim| − |j|)
+
+    输入为带符号电流密度（mA cm^-2，阴极反应为负），j_lim 为扩散极限
+    （取最负值）。返回与输入同符号的动力学电流密度；分母趋近 0 处返回 nan。
+    """
+    j = np.asarray(j, float)
+    j_lim = np.asarray(j_lim, float)
+    aj, al = np.abs(j), np.abs(j_lim)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        jk = aj * al / (al - aj)
+    jk = np.where(np.isfinite(jk), jk, np.nan)
+    return np.sign(j) * jk
+
+
+# ----------------------------------------------------------------------
+# 6) CV 循环切分与稳定圈选择
+# ----------------------------------------------------------------------
+def extract_cv_cycles(x, y):
+    """把完整 CV（多圈三角波）按电位转向点切分为单圈循环。
+
+    返回 [(x0, y0), (x1, y1), ...]，每圈从电位极小点（谷）到下一个谷；
+    无法识别转向时返回 [(x, y)] 整体。
+    """
+    x = np.asarray(x, float)
+    y = np.asarray(y, float)
+    d = np.diff(x)
+    sign = np.sign(d)
+    # 转向点：相邻非零符号变化的位置（x 索引）
+    turns = [
+        i + 1
+        for i in range(len(sign) - 1)
+        if sign[i] != 0 and sign[i + 1] != 0 and sign[i] != sign[i + 1]
+    ]
+    if len(turns) < 2:
+        return [(x, y)]
+    # 谷：转向后方向由降变升（电位极小点）
+    valleys = [t for t in turns if sign[t - 1] < 0 < sign[t]]
+    if len(valleys) < 2:
+        return [(x, y)]
+    cycles = []
+    for k in range(len(valleys) - 1):
+        a, b = valleys[k], valleys[k + 1]
+        cycles.append((x[a:b + 1], y[a:b + 1]))
+    return cycles
+
+
+def select_stable_cycle(x, y, cycle_index: int = -1):
+    """从多圈 CV 中选取稳定的一圈（默认最后一圈）。
+
+    cycle_index >= 0 时按绝对索引取；负数按从后往前（-1 = 最后一圈）。
+    越界时自动夹取到有效范围。
+    """
+    cycles = extract_cv_cycles(x, y)
+    idx = cycle_index if cycle_index >= 0 else len(cycles) + cycle_index
+    idx = max(0, min(idx, len(cycles) - 1))
+    return cycles[idx]
