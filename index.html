@@ -1568,24 +1568,31 @@ function interp(xq, xs, ys){
 /* ===== Savitzky-Golay smoothing (window win, 2nd-order polynomial) ===== */
 function sgSmooth(y, win){
   if (win < 3 || win % 2 === 0) win = 5;
-  const n = y.length, half = (win - 1) >> 1;
-  const out = y.slice();
-  const m = (win - 1) >> 1;
-  let sx = 0, sx2 = 0, sx3 = 0, sx4 = 0;
-  for (let i = -m; i <= m; i++){ sx += i; sx2 += i*i; sx3 += i*i*i; sx4 += i*i*i*i; }
-  const s0 = win, s1 = sx, s2 = sx2, s3 = sx3, s4 = sx4;
-  const det = s0*(s2*s4 - s3*s3) - s1*(s1*s4 - s2*s3) + s2*(s1*s3 - s2*s2);
-  if (Math.abs(det) < 1e-30) return out;
-  const c0 = (s2*s4 - s3*s3) / det;
-  const c2 = (s0*s4 - s2*s2) / det;
-  for (let i = 0; i < n; i++){
-    let sum = 0;
-    for (let j = -m; j <= m; j++){
-      const k = Math.min(Math.max(i + j, 0), n - 1);
-      sum += y[k] * (c0 + c2 * j * j);
+  const n = y.length; const m = (win - 1) >> 1;
+  let s0=0,s1=0,s2=0,s3=0,s4=0;
+  for (let i=-m;i<=m;i++){s0+=1;s1+=i;s2+=i*i;s3+=i*i*i;s4+=i*i*i*i;}
+  const denom = s0*s4 - s2*s2;
+  if (Math.abs(denom) < 1e-30) return y.slice();
+  const out = new Array(n);
+  for (let i=0;i<n;i++){
+    let sum=0;
+    for (let j=-m;j<=m;j++){
+      const k=Math.min(Math.max(i+j,0),n-1);
+      sum += y[k] * (s4 - s2 * j * j);
     }
-    out[i] = sum;
+    out[i] = sum / denom;
   }
+  return out;
+}
+function extractForwardScan(pots, curs){
+  if (pots.length < 3) return { pots, curs };
+  let maxIdx = 0;
+  for (let i = 1; i < pots.length; i++){ if (pots[i] > pots[maxIdx]) maxIdx = i; }
+  if (maxIdx > 0 && maxIdx < pots.length - 1){
+    return { pots: pots.slice(0, maxIdx + 1), curs: curs.slice(0, maxIdx + 1) };
+  }
+  return { pots, curs };
+}
   return out;
 }
 
@@ -1795,10 +1802,10 @@ $("lsvBtn").addEventListener("click", () => {
   if (n2txt){
     const n2 = parse2col(n2txt, $("o2PotUnit").value, $("n2CurUnit").value);
     if (n2.length >= 2){
-      const n2s = n2.slice().sort((a,b)=>a[0]-b[0]);
-      const nX = n2s.map(r => r[0]);
-      const nY = n2s.map(r => r[1] * 1000 / A);
-      corrected = Y.map((y, i) => y - interp(X[i], nX, nY));
+      const nPots = n2.map(r => r[0]);
+      const nCurs = n2.map(r => r[1] * 1000 / A);
+      const fwd = extractForwardScan(nPots, nCurs);
+      corrected = Y.map((y, i) => y - interp(X[i], fwd.pots, fwd.curs));
     }
   }
   // Savitzky-Golay smoothing (window 7, 2nd-order) to reduce N₂-correction noise
