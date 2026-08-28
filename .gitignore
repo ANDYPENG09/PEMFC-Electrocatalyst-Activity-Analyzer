@@ -12,7 +12,3 @@ venv/
 # Temp files
 *.tmp
 *.bak
-
-# Generated demo outputs (run_example.py)
-*.png
-!sample_data/*.png
