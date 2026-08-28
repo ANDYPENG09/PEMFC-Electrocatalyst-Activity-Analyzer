@@ -11,29 +11,15 @@ A self-contained, offline electrochemistry calculator for **PEM fuel cell cataly
 - **Full CV cycle export** — Plots show the complete anodic + cathodic sweep; H-upd integration region highlighted; baseline and peak area clearly visualized.
 - **Three-standard compatibility** — Based on GB/T 20042.4-2025, methods compatible with US DOE and EU JRC/IEC protocols (q = 0.21 mC/cm²).
 - **Ink-concentration loading** — Catalyst loading auto-calculated from ink concentration (mg/mL), drop volume (µL), RDE area, and Pt weight fraction (30%/50% preset buttons).
-- **Single-file HTML app** — English UI, no server, no build step, no internet required. Works offline.
-- **Python toolchain included** — Formula module, publication-style plotting, Autolab `.paax` parser, and Origin `.opju` exporter for local batch workflows.
+- **English & Chinese versions** — Both included.
+- **Pure frontend** — Single HTML file, no server, no build step, no internet required. Works offline.
 
-## Quick Start (browser)
+## Quick Start
 
-1. Open `index.html` in any modern browser.
+1. Open `electrochem_calculator_en.html` (English) or `electrochem_calculator.html` (Chinese) in any modern browser.
 2. Click **Load Example Data** to see a pre-filled demo (EC-30-PtCo sample).
 3. Or paste your own CV data (potential V, current A) into the CV textarea.
 4. Click **Calculate ECSA** → results appear instantly with SVG charts.
-
-## Quick Start (Python toolchain)
-
-```bash
-pip install numpy pandas matplotlib
-python run_example.py          # runs both CSV and .paax chains, writes PNG figures
-```
-
-`run_example.py` demonstrates two equivalent data paths:
-
-- **A) CSV chain** — reads the CSV files exported from Origin/NOVA directly.
-- **B) `.paax` chain** — reads the raw Autolab NOVA `.paax` file, converts current to current density with `electrochem_calc`, and plots — no Origin needed. A consistency check confirms the two chains agree (deviation ≈ 0 on the bundled demo data).
-
-The demo files under `sample_data/` are desensitized synthetic data (regenerate with `python gen_sample_data.py`); replace them with your own exports.
 
 ## Formulas
 
@@ -80,16 +66,16 @@ Potential(V)  Current(A)
 ## File Structure
 
 ```
-├── index.html                  # Single-file HTML app (English UI, offline)
-├── electrochem_calc.py         # Formula module (unit conversion, RHE, iR, E1/2, K-L, CV cycle split)
-├── electrochem_plot.py         # Publication-style matplotlib plotting (ORR LSV / CV / Tafel)
-├── read_paax.py                # Autolab NOVA .paax raw-file parser
-├── extract_origin.py           # Origin .opju worksheet exporter (needs Origin + originpro)
-├── run_example.py              # Demo runner: CSV chain + .paax chain + consistency check
-├── gen_sample_data.py          # Regenerates the desensitized synthetic sample_data
-├── sample_data/                # Demo data: O2LSV.csv, CV.csv, EC-30-PtCo-Step1.paax
-├── LICENSE                     # MIT License
-└── .gitignore
+electrochem_template/
+├── README.md                          # This file
+├── LICENSE                            # MIT License
+├── electrochem_calculator.html        # Chinese version
+├── electrochem_calculator_en.html     # English version
+├── electrochem_calc.py                # Python helper (formula functions)
+├── electrochem_plot.py                # Python matplotlib plotting
+├── read_paax.py                       # Autolab .paax parser
+├── extract_origin.py                  # Origin .opju extractor
+└── run_example.py                     # Demo runner
 ```
 
 ## Browser Compatibility
