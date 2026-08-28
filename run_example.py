@@ -38,8 +38,8 @@ LSV_CONFIG = [
 CV_CSV = os.path.join(SAMPLE, "CV.csv")
 CV_XCOL, CV_YCOL = "1", "C"
 
-# —— B) .paax 原始文件链路（示例文件在 sample_data/；换成你自己的 .paax 路径即可）——
-PAAX = os.path.join(SAMPLE, "EC-30-PtCo-Step1.paax")
+# —— B) .paax 原始文件链路 ——
+PAAX = r"D:\实验\催化剂\PtCo\有序化合金\分步还原\EC-30-PtCo-Step1\EC-30-PtCo-Step1.paax"
 
 OUT_LSV = os.path.join(HERE, "ORR_LSV.png")
 OUT_CV = os.path.join(HERE, "CV.png")
@@ -84,8 +84,8 @@ def main():
     # 关键公式：电流(A) -> 电流密度(mA cm^-2)： j = I / A * 1000
     o2_j = current_to_density(o2["Y"], ELECTRODE_AREA_CM2)   # O2 电流密度
     n2_j = current_to_density(n2["Y"], ELECTRODE_AREA_CM2)   # N2 背景密度
-    # 背景校正：把 N2 插值到 O2 的电位网格上相减（电位降序存储，先反转为升序）
-    n2_j_on_o2 = np.interp(o2["X"], n2["X"][::-1], n2_j[::-1])
+    # 背景校正：把 N2 插值到 O2 的电位网格上相减
+    n2_j_on_o2 = np.interp(o2["X"], n2["X"], n2_j)
     o2_j_corr = o2_j - n2_j_on_o2                            # 校正后 O2
 
     fig_lsv2 = plot_orr_lsv([
@@ -106,8 +106,7 @@ def main():
 
     # ---------- 一致性校验：.paax 公式结果 vs CSV ----------
     csv_o2 = load_xy(os.path.join(SAMPLE, "O2LSV.csv"), "O2 Potential", "O2 Current Density")
-    _ord = np.argsort(csv_o2[0])                       # CSV 电位同样可能降序
-    csv_o2j = np.interp(o2["X"], csv_o2[0][_ord], csv_o2[1][_ord])  # 插值到 paax 网格
+    csv_o2j = np.interp(o2["X"], csv_o2[0], csv_o2[1])  # 插值到 paax 网格
     err = np.max(np.abs(o2_j - csv_o2j))
     print(f"[校验] .paax公式电流密度 与 CSV 电流密度 最大偏差 = {err:.4f} mA/cm² "
           f"(面积={ELECTRODE_AREA_CM2} cm²)")
