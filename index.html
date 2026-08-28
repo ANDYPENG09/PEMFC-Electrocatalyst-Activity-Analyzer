@@ -219,11 +219,22 @@
     <button class="btn-danger btn" id="cvClear">Clear CV</button>
     <button class="btn-secondary btn" id="loadExample">Load Example Data</button>
   </div>
+  <div class="row" style="margin:6px 0; display:flex; align-items:center;">
+    <label style="font-size:13px;color:#424245;display:flex;align-items:center;gap:6px;">
+      <input type="checkbox" id="pngTransparent" style="width:auto;margin:0;"> PNG transparent background (applies to CV &amp; LSV exports)
+    </label>
+  </div>
   <p class="hint" id="cvMsg"></p>
 
   <div class="plot-grid">
     <div class="plot" id="cvPlotFull"></div>
     <div class="plot" id="cvPlotZoom"></div>
+  </div>
+  <div class="row" style="margin:8px 0 4px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+    <span style="font-size:13px;color:#424245;">Hupd plot X-axis range (V):</span>
+    <label style="font-size:13px;color:#424245;">Min <input id="cvXmin" type="number" step="0.05" value="0" style="width:64px;padding:2px 4px;"></label>
+    <label style="font-size:13px;color:#424245;">Max <input id="cvXmax" type="number" step="0.05" placeholder="auto" style="width:64px;padding:2px 4px;"></label>
+    <button class="btn-secondary btn" id="cvApplyX" type="button">Apply X-axis</button>
   </div>
 
   <div class="result">
@@ -280,6 +291,12 @@
       <button class="btn-secondary btn" id="lsvPng">Download LSV Plot</button>
       <button class="btn-danger btn" id="lsvClear">Clear LSV</button>
     </div>
+    <div class="row" style="margin:6px 0 2px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+      <span style="font-size:13px;color:#424245;">Y-axis range (mA/cm²):</span>
+      <label style="font-size:13px;color:#424245;">Min <input id="lsvYmin" type="number" step="0.5" value="-6" style="width:64px;padding:2px 4px;"></label>
+      <label style="font-size:13px;color:#424245;">Max <input id="lsvYmax" type="number" step="0.5" placeholder="auto" style="width:64px;padding:2px 4px;"></label>
+      <button class="btn-secondary btn" id="lsvApplyY" type="button">Apply Y-axis</button>
+    </div>
     <p class="hint" id="lsvMsg"></p>
   </details>
 
@@ -296,7 +313,7 @@
 <div class="card">
   <div class="card-title">Results Summary</div>
   <table class="summary">
-    <thead><tr><th>ECSA</th><th>MA</th><th>SA</th></thead>
+    <thead><tr><th>ECSA</th><th>MA</th><th>SA</th></tr></thead>
     <tbody>
       <tr>
         <td><span id="sumEcsa">&mdash;</span><span class="u">m²/g<sub>Pt</sub></span></td>
@@ -307,6 +324,7 @@
   </table>
   <div class="btn-row">
     <button class="btn-secondary btn" id="exportCsv">Export CSV</button>
+    <button class="btn-secondary btn" id="summaryPng">Export Summary (16:9)</button>
   </div>
 </div>
 
@@ -597,12 +615,12 @@ const EXAMPLE_CV = `0.02668	-9.4167E-5
 1.0117	-1.8861E-5
 1.0067	-1.9358E-5
 1.0017	-1.978E-5
-0.99673	-2.0897E-5
-0.99174	-2.1466E-5
-0.98673	-2.2024E-5
-0.98174	-2.2641E-5
-0.97673	-2.3258E-5
-0.97174	-2.3941E-5
+0.99673	-2.0333E-5
+0.99174	-2.0841E-5
+0.98673	-2.1432E-5
+0.98174	-2.1975E-5
+0.97673	-2.2622E-5
+0.97174	-2.3266E-5
 0.96672	-2.3961E-5
 0.96173	-2.4617E-5
 0.95671	-2.5403E-5
@@ -1288,7 +1306,7 @@ const EXAMPLE_O2 = `0.00104	-0.00122
 0.11295	-0.00112
 0.11808	-0.00112
 0.12329	-0.00112
-0.1284	-0.00112
+0.1284	-0.00113
 0.13355	-0.00113
 0.13855	-0.00113
 0.14389	-0.00113
@@ -1568,32 +1586,40 @@ function interp(xq, xs, ys){
 /* ===== Savitzky-Golay smoothing (window win, 2nd-order polynomial) ===== */
 function sgSmooth(y, win){
   if (win < 3 || win % 2 === 0) win = 5;
-  const n = y.length; const m = (win - 1) >> 1;
-  let s0=0,s1=0,s2=0,s3=0,s4=0;
-  for (let i=-m;i<=m;i++){s0+=1;s1+=i;s2+=i*i;s3+=i*i*i;s4+=i*i*i*i;}
+  const n = y.length;
+  const m = (win - 1) >> 1;
+  let s0 = 0, s1 = 0, s2 = 0, s3 = 0, s4 = 0;
+  for (let i = -m; i <= m; i++){ s0 += 1; s1 += i; s2 += i*i; s3 += i*i*i; s4 += i*i*i*i; }
+  // Convolution kernel for the constant term of a degree-2 polynomial fit:
+  //   h(j) = (s4 - s2*j^2) / (s0*s4 - s2^2)
+  // (Standard SG kernel for window=7, order=2: [-2,3,6,7,6,3,-2]/21, sum=1)
   const denom = s0*s4 - s2*s2;
   if (Math.abs(denom) < 1e-30) return y.slice();
   const out = new Array(n);
-  for (let i=0;i<n;i++){
-    let sum=0;
-    for (let j=-m;j<=m;j++){
-      const k=Math.min(Math.max(i+j,0),n-1);
+  for (let i = 0; i < n; i++){
+    let sum = 0;
+    for (let j = -m; j <= m; j++){
+      const k = Math.min(Math.max(i + j, 0), n - 1);
       sum += y[k] * (s4 - s2 * j * j);
     }
     out[i] = sum / denom;
   }
   return out;
 }
+
+/* ===== Extract Forward Scan from possibly full-cycle data ===== */
 function extractForwardScan(pots, curs){
   if (pots.length < 3) return { pots, curs };
+  // Find the index of maximum potential; if it's not the last point,
+  // the data is a full cycle - keep only the ascending (forward) portion.
   let maxIdx = 0;
-  for (let i = 1; i < pots.length; i++){ if (pots[i] > pots[maxIdx]) maxIdx = i; }
+  for (let i = 1; i < pots.length; i++){
+    if (pots[i] > pots[maxIdx]) maxIdx = i;
+  }
   if (maxIdx > 0 && maxIdx < pots.length - 1){
     return { pots: pots.slice(0, maxIdx + 1), curs: curs.slice(0, maxIdx + 1) };
   }
   return { pots, curs };
-}
-  return out;
 }
 
 /* ===== Split Sweeps ===== */
@@ -1619,25 +1645,78 @@ function svgChart(el, series, opt){
   (opt.regions||[]).forEach(r => { xs.push(r.x0); xs.push(r.x1); });
   let xmin = Math.min(...xs), xmax = Math.max(...xs);
   let ymin = Math.min(...ys), ymax = Math.max(...ys);
-  if (opt.ymin !== undefined) ymin = opt.ymin;
-  if (opt.ymax !== undefined) ymax = opt.ymax;
+  const yFloorSet = (opt.ymin !== undefined);
+  const yCeilSet = (opt.ymax !== undefined);
+  const xFloorSet = (opt.xmin !== undefined);
+  const xCeilSet = (opt.xmax !== undefined);
+  if (yFloorSet) ymin = opt.ymin;
+  if (yCeilSet) ymax = opt.ymax;
+  if (xFloorSet) xmin = opt.xmin;
+  if (xCeilSet) xmax = opt.xmax;
   if (xmin === xmax) xmax = xmin + 1;
   if (ymin === ymax) ymax = ymin + 1;
-  const ypad = (ymax - ymin) * 0.08; ymin -= ypad; ymax += ypad;
+  const ypad = (ymax - ymin) * 0.08;
+  if (!yFloorSet) ymin -= ypad;
+  if (!yCeilSet) ymax += ypad;
+  // ===== nice-numbers axis ticks (Heckbert 1990) =====
+  // 让步长落在 1 / 2 / 5 x 10^k 的"漂亮"倍数上，例如 0.1, 0.2, 0.5, 1, 2, 5, 10
+  const niceNum = (range, round) => {
+    if (range <= 0) return 1;
+    const exp = Math.floor(Math.log10(range));
+    const f = range / Math.pow(10, exp);
+    let nf;
+    if (round){
+      if (f < 1.5) nf = 1;
+      else if (f < 3) nf = 2;
+      else if (f < 7) nf = 5;
+      else nf = 10;
+    } else {
+      if (f < 1) nf = 1;
+      else if (f < 2) nf = 2;
+      else if (f < 5) nf = 5;
+      else nf = 10;
+    }
+    return nf * Math.pow(10, exp);
+  };
+  const niceAxis = (lo, hi, target) => {
+    const step = niceNum((hi - lo) / (target - 1), true);
+    const newMin = Math.floor(lo / step) * step;
+    const newMax = Math.ceil(hi / step) * step;
+    return { min: newMin, max: newMax, step };
+  };
+  const yt = niceAxis(ymin, ymax, opt.yticks || 6);
+  const xt = niceAxis(xmin, xmax, 6);
+  ymin = yt.min; ymax = yt.max;
+  xmin = xt.min; xmax = xt.max;
   const X = v => pad.l + (v - xmin)/(xmax - xmin) * (W - pad.l - pad.r);
   const Y = v => H - pad.b - (v - ymin)/(ymax - ymin) * (H - pad.t - pad.b);
+  // Integer when on step; 0.5-step uses 1 decimal; otherwise 2 decimals
+  // 根据 step 自动取足够的小数位，避免相邻 tick 撞名（step=0.05->2 位, 0.1->1 位, 1->0 位）
+  // 0 / 整数仍走整数分支，显示为 "0" 而非 "0.00"
+  const fmtTick = (v, step) => {
+    if (Math.abs(v - Math.round(v)) < step * 1e-6) return String(Math.round(v));
+    if (step >= 1) return v.toFixed(0);
+    const d = Math.max(1, -Math.floor(Math.log10(step)));
+    return v.toFixed(d);
+  };
   let s = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" style="background:#fff;">`;
   s += `<text x="${W/2}" y="18" text-anchor="middle" font-size="12" fill="#1d1d1f" font-weight="600">${opt.title||""}</text>`;
   s += `<line x1="${pad.l}" y1="${H-pad.b}" x2="${W-pad.r}" y2="${H-pad.b}" stroke="#d2d2d7"/>`;
   s += `<line x1="${pad.l}" y1="${pad.t}" x2="${pad.l}" y2="${H-pad.b}" stroke="#d2d2d7"/>`;
-  for (let k=0;k<=3;k++){ const v=ymin+(ymax-ymin)*k/3, y=Y(v);
+  // Y grid + ticks (nice)
+  for (let v = yt.min; v <= yt.max + yt.step * 1e-9; v += yt.step){
+    const y = Y(v);
     s += `<line x1="${pad.l}" y1="${y}" x2="${W-pad.r}" y2="${y}" stroke="#f0f0f2"/>`;
-    s += `<text x="${pad.l-6}" y="${y+3}" text-anchor="end" font-size="10" fill="#6e6e73">${v.toFixed(2)}</text>`; }
-  for (let k=0;k<=4;k++){ const v=xmin+(xmax-xmin)*k/4, x=X(v);
+    s += `<text x="${pad.l-6}" y="${y+3}" text-anchor="end" font-size="10" fill="#6e6e73">${fmtTick(v, yt.step)}</text>`;
+  }
+  // X grid + ticks (nice)
+  for (let v = xt.min; v <= xt.max + xt.step * 1e-9; v += xt.step){
+    const x = X(v);
     s += `<line x1="${x}" y1="${pad.t}" x2="${x}" y2="${H-pad.b}" stroke="#f0f0f2"/>`;
-    s += `<text x="${x}" y="${H-pad.b+14}" text-anchor="middle" font-size="10" fill="#6e6e73">${v.toFixed(2)}</text>`; }
+    s += `<text x="${x}" y="${H-pad.b+14}" text-anchor="middle" font-size="10" fill="#6e6e73">${fmtTick(v, xt.step)}</text>`;
+  }
   s += `<text x="${W/2}" y="${H-4}" text-anchor="middle" font-size="11" fill="#424245">${opt.xlabel||"E (V)"}</text>`;
-  s += `<text x="12" y="${H/2}" text-anchor="middle" font-size="11" fill="#424245" transform="rotate(-90 12 ${H/2})">${opt.ylabel||"J (mA/cm\u00B2)"}</text>`;
+  s += `<text x="12" y="${H/2}" text-anchor="middle" font-size="11" fill="#424245" transform="rotate(-90 12 ${H/2})">${opt.ylabel||"J (mA/cm²)"}</text>`;
   (opt.regions||[]).forEach(r => {
     const x0 = X(r.x0), x1 = X(r.x1);
     s += `<rect x="${Math.min(x0,x1)}" y="${pad.t}" width="${Math.abs(x1-x0)}" height="${H-pad.b-pad.t}" fill="${r.color||"#0071e3"}" opacity="0.10"/>`;
@@ -1706,17 +1785,22 @@ function calcECSA(){
   }
   pts.sort((a, b) => a[0] - b[0]);
   const px = pts.map(p => p[0]), py = pts.map(p => p[1]);
+  // Baseline = current density at 0.40 V on the anodic sweep (read directly from the curve, no lo-boundary interpolation)
   const mode = $("baselineMode").value;
   let j_bg;
   if (mode === "manual"){
     const b = parseFloat($("baseline").value);
-    j_bg = isNaN(b) ? py[py.length - 1] : b;
+    j_bg = isNaN(b) ? interp(0.40, sx, sy) : b;
   } else {
-    j_bg = py[py.length - 1];
+    j_bg = interp(0.40, sx, sy);
   }
+  // Skip region where curve is below the baseline (count only peak above j_bg; excludes reverse / negative area)
+  let startIdx = 0;
+  for (let i = 0; i < py.length; i++){ if (py[i] >= j_bg){ startIdx = i; break; } }
+  const pxI = px.slice(startIdx), pyI = py.slice(startIdx);
   let area = 0;
-  for (let i = 1; i < px.length; i++){
-    area += (px[i] - px[i-1]) * ((py[i-1] - j_bg) + (py[i] - j_bg)) / 2;
+  for (let i = 1; i < pxI.length; i++){
+    area += (pxI[i] - pxI[i-1]) * ((pyI[i-1] - j_bg) + (pyI[i] - j_bg)) / 2;
   }
   const SH = Math.abs(area);
   const QH = SH / v;
@@ -1728,9 +1812,9 @@ function calcECSA(){
   $("o_ecsa").textContent = fmt(ecsa_m2g, 2);
   $("o_ecsa_cm2").textContent = fmt(ecsa_cm2, 3);
   $("o_rf").textContent = fmt(rf, 2);
-  $("cvMsg").textContent = `S_H = ${SH.toFixed(5)} mA\u00B7V/cm\u00B2; baseline j_bg = ${j_bg.toFixed(5)} mA/cm\u00B2 (last positive current point in range).`;
+  $("cvMsg").textContent = `S_H = ${SH.toFixed(5)} mA\u00B7V/cm\u00B2; baseline j_bg = j@0.40V = ${j_bg.toFixed(5)} mA/cm\u00B2 (read directly from the anodic sweep curve).`;
   updateSummary();
-  drawCvPlots(lo, hi, px, py, j_bg);
+  drawCvPlots(lo, hi, pxI, pyI, j_bg);
 }
 
 /* ===== Plotting ===== */
@@ -1743,17 +1827,18 @@ function drawCvPlots(lo, hi, px, py, j_bg){
   svgChart($("cvPlotFull"), [
     { x: lastFullCycle.X, y: lastFullCycle.Y, color: "#1d1d1f" }
   ], {
-    title: "CV \u00B7 Full Cycle", xlabel: "E (V vs RHE)", ylabel: "J (mA/cm\u00B2)",
+    title: "CV", xlabel: "E (V vs RHE)", ylabel: "J (mA/cm\u00B2)",
     regions: [{ x0: lo, x1: hi, color: "#0071e3" }]
   });
+  lastCvZoom = { px, py, j_bg };
   const baselineY = px.map(() => j_bg);
   svgChart($("cvPlotZoom"), [
     { x: px, y: py, color: "#0071e3" },
     { x: px, y: baselineY, color: "#d70015", dashed: true }
-  ], {
+  ], Object.assign({
     title: "Hupd Peak \u00B7 Baseline-subtracted Area", xlabel: "E (V vs RHE)", ylabel: "J (mA/cm\u00B2)",
     fills: [{ x: px, y: py, base: baselineY, color: "#00875a" }]
-  });
+  }, cvXOpt()));
 }
 
 /* ===== ORR ===== */
@@ -1802,6 +1887,8 @@ $("lsvBtn").addEventListener("click", () => {
   if (n2txt){
     const n2 = parse2col(n2txt, $("o2PotUnit").value, $("n2CurUnit").value);
     if (n2.length >= 2){
+      // N₂ data may be a full CV cycle; do NOT sort (would scramble the cycle).
+      // Extract only the ascending (forward) scan before interpolating.
       const nPots = n2.map(r => r[0]);
       const nCurs = n2.map(r => r[1] * 1000 / A);
       const fwd = extractForwardScan(nPots, nCurs);
@@ -1823,10 +1910,11 @@ $("lsvBtn").addEventListener("click", () => {
   const mk = [];
   if (!isNaN(jlimE)) mk.push({ x: jlimE, y: jlim, color: "#d70015", label: "j_lim" });
   if (!isNaN(E)) mk.push({ x: E, y: jE, color: "#0071e3", label: "j@E" });
-  svgChart($("lsvPlot"), [{ x: X, y: corrected, color: "#00875a" }], {
+  lastLsvX = X; lastLsvY = corrected;
+  svgChart($("lsvPlot"), [{ x: X, y: corrected, color: "#00875a" }], Object.assign({
     title: "LSV (N\u2082-corrected)", xlabel: "E (V vs RHE)", ylabel: "J (mA/cm\u00B2)",
-    markers: mk, ymin: -6
-  });
+    markers: mk
+  }, lsvYOpt()));
   $("lsvPlot").style.display = "block";
 });
 
@@ -1847,10 +1935,53 @@ $("lsvClear").addEventListener("click", () => {
   updateSummary();
 });
 
+
+
+/* ===== CV Hupd X-axis manual control ===== */
+let lastCvZoom = null;
+function cvXOpt(){
+  const o = { xticks: 9 };
+  const xmin = parseFloat($("cvXmin").value);
+  const xmax = parseFloat($("cvXmax").value);
+  if (!isNaN(xmin)) o.xmin = xmin;
+  if (!isNaN(xmax)) o.xmax = xmax;
+  return o;
+}
+$("cvApplyX").addEventListener("click", () => {
+  if (!lastCvZoom){ alert("Please generate the Hupd plot first."); return; }
+  const { px, py, j_bg } = lastCvZoom;
+  const baselineY = px.map(() => j_bg);
+  svgChart($("cvPlotZoom"), [
+    { x: px, y: py, color: "#0071e3" },
+    { x: px, y: baselineY, color: "#d70015", dashed: true }
+  ], Object.assign({
+    title: "Hupd Peak \u00B7 Baseline-subtracted Area", xlabel: "E (V vs RHE)", ylabel: "J (mA/cm\u00B2)",
+    fills: [{ x: px, y: py, base: baselineY, color: "#00875a" }]
+  }, cvXOpt()));
+});
+
+/* ===== LSV Y-axis manual control ===== */
+let lastLsvX = null, lastLsvY = null;
+function lsvYOpt(){
+  const o = { yticks: 8 };
+  const ymin = parseFloat($("lsvYmin").value);
+  const ymax = parseFloat($("lsvYmax").value);
+  if (!isNaN(ymin)) o.ymin = ymin;
+  if (!isNaN(ymax)) o.ymax = ymax;
+  return o;
+}
+$("lsvApplyY").addEventListener("click", () => {
+  if (!lastLsvX){ alert("Please generate the LSV plot first."); return; }
+  svgChart($("lsvPlot"), [{ x: lastLsvX, y: lastLsvY, color: "#00875a" }],
+           Object.assign({ title: "LSV (N₂-corrected)", xlabel: "E (V vs RHE)", ylabel: "J (mA/cm²)" }, lsvYOpt()));
+});
+
 /* ===== Export PNG ===== */
 function exportPNG(el, filename){
   const svg = getSVG(el); if (!svg){ alert("Please generate the plot first."); return; }
-  const xml = new XMLSerializer().serializeToString(svg);
+  const transparent = $("pngTransparent") && $("pngTransparent").checked;
+  let xml = new XMLSerializer().serializeToString(svg);
+  if (transparent) xml = xml.split(' style="background:#fff;"').join('');
   const svg64 = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(xml)));
   const img = new Image();
   img.onload = () => {
@@ -1858,7 +1989,7 @@ function exportPNG(el, filename){
     const canvas = document.createElement("canvas");
     canvas.width = 540 * scale; canvas.height = 300 * scale;
     const ctx = canvas.getContext("2d");
-    ctx.fillStyle = "#fff"; ctx.fillRect(0,0,canvas.width,canvas.height);
+    if (!transparent){ ctx.fillStyle = "#fff"; ctx.fillRect(0,0,canvas.width,canvas.height); }
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
     canvas.toBlob(blob => {
       const a = document.createElement("a");
@@ -1867,7 +1998,130 @@ function exportPNG(el, filename){
   };
   img.src = svg64;
 }
-$("cvPng").addEventListener("click", () => exportPNG($("cvPlotFull"), "CV_full_cycle.png"));
+function exportPNGCombined(els, filename){
+  const svgs = els.map(el => el.querySelector("svg")).filter(Boolean);
+  if (!svgs.length){ alert("Please generate plots first."); return; }
+  const transparent = $("pngTransparent") && $("pngTransparent").checked;
+  const scale = 2, w = 540 * scale, h = 300 * scale;
+  const canvas = document.createElement("canvas");
+  canvas.width = w; canvas.height = h * svgs.length;
+  const ctx = canvas.getContext("2d");
+  if (!transparent){ ctx.fillStyle = "#fff"; ctx.fillRect(0,0,canvas.width,canvas.height); }
+  let loaded = 0;
+  svgs.forEach((svg, idx) => {
+    let xml = new XMLSerializer().serializeToString(svg);
+    if (transparent) xml = xml.split(' style="background:#fff;"').join('');
+    const svg64 = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(xml)));
+    const img = new Image();
+    img.onload = () => {
+      ctx.drawImage(img, 0, idx * h, w, h);
+      loaded++;
+      if (loaded === svgs.length){
+        canvas.toBlob(blob => {
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+        });
+      }
+    };
+    img.src = svg64;
+  });
+}
+
+/* ===== 16:9 汇总图导出 ===== */
+function exportSummary(){
+  const cvSvg = $("cvPlotFull").querySelector("svg");
+  const lsvSvg = $("lsvPlot").querySelector("svg");
+  const hupdSvg = $("cvPlotZoom").querySelector("svg");
+  if (!cvSvg || !lsvSvg || !hupdSvg){ alert("Please generate all plots first (click Calculate ECSA and N₂ Correct &amp; Extract)."); return; }
+  const transparent = $("pngTransparent") && $("pngTransparent").checked;
+  const W = 1920, H = 1080;  // 16:9 for PPT
+  const canvas = document.createElement("canvas");
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  if (!transparent){ ctx.fillStyle = "#fff"; ctx.fillRect(0,0,W,H); }
+  const margin = 28, gap = 20;
+  const panelW = (W - 2*margin - gap) / 2;
+  const panelH = (H - 2*margin - gap) / 2;
+  const panels = {
+    cv:   {x: margin,                y: margin,                  },
+    lsv:  {x: margin + panelW + gap, y: margin,                  },
+    hupd: {x: margin,                y: margin + panelH + gap,   },
+    res:  {x: margin + panelW + gap, y: margin + panelH + gap, title: "Results Summary"}
+  };
+  const svgs = [
+    {key:"cv",   svg:cvSvg},
+    {key:"lsv",  svg:lsvSvg},
+    {key:"hupd", svg:hupdSvg}
+  ];
+  let loaded = 0;
+  svgs.forEach(({key, svg}) => {
+    let xml = new XMLSerializer().serializeToString(svg);
+    if (transparent) xml = xml.split(' style="background:#fff;"').join('');
+    const svg64 = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(xml)));
+    const img = new Image();
+    img.onload = () => {
+      const p = panels[key];
+      if (!transparent){ ctx.fillStyle = "#fafafa"; ctx.fillRect(p.x, p.y, panelW, panelH); }
+      ctx.strokeStyle = "#d2d2d7"; ctx.lineWidth = 1;
+      ctx.strokeRect(p.x + 0.5, p.y + 0.5, panelW - 1, panelH - 1);
+      // SVG 缩放绘制到面板内（保留少量内边距）
+      const innerW = panelW - 10, innerH = panelH - 10;
+      ctx.drawImage(img, p.x + 5, p.y + 5, innerW, innerH);
+      loaded++;
+      if (loaded === svgs.length){
+        // 绘制结果汇总面板
+        const rp = panels.res;
+        if (!transparent){ ctx.fillStyle = "#fafafa"; ctx.fillRect(rp.x, rp.y, panelW, panelH); }
+        ctx.strokeStyle = "#d2d2d7";
+        ctx.strokeRect(rp.x + 0.5, rp.y + 0.5, panelW - 1, panelH - 1);
+        ctx.fillStyle = "#1d1d1f";
+        ctx.font = "700 24px -apple-system, BlinkMacSystemFont, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+        ctx.fillText(rp.title, rp.x + panelW/2, rp.y + 18);
+        // 分隔线
+        ctx.strokeStyle = "#e5e5ea";
+        ctx.beginPath(); ctx.moveTo(rp.x + 24, rp.y + 58); ctx.lineTo(rp.x + panelW - 24, rp.y + 58); ctx.stroke();
+        const items = [
+          ["ECSA", $("o_ecsa").textContent, "m²/gPt"],
+          ["MA",   $("o_ma").textContent,   "A/mgPt"],
+          ["SA",   $("o_sa").textContent,   "mA/cm²"],
+          ["S_H",  $("o_SH").textContent,  "mA·V/cm²"],
+          ["Q_H",  $("o_QH").textContent,  "mC/cm²"],
+          ["j_k",  $("o_jk").textContent,  "mA/cm²"]
+        ];
+        const startY = rp.y + 78;
+        const itemH = 70;
+        const leftX = rp.x + 28, rightX = rp.x + panelW - 28;
+        items.forEach((it, i) => {
+          const yi = startY + i * itemH;
+          const midY = yi + itemH/2;
+          ctx.textBaseline = "middle";
+          ctx.fillStyle = "#6e6e73";
+          ctx.font = "500 22px -apple-system, sans-serif";
+          ctx.textAlign = "left";
+          ctx.fillText(it[0], leftX, midY - 4);
+          ctx.fillStyle = "#1d1d1f";
+          ctx.font = "700 32px -apple-system, sans-serif";
+          ctx.textAlign = "right";
+          ctx.fillText(it[1], rightX, midY - 12);
+          ctx.fillStyle = "#86868b";
+          ctx.font = "400 16px -apple-system, sans-serif";
+          ctx.fillText(it[2], rightX, midY + 16);
+        });
+        canvas.toBlob(blob => {
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = "PEMFC_summary.png";
+          a.click();
+        }, "image/png");
+      }
+    };
+    img.src = svg64;
+  });
+}
+$("summaryPng").addEventListener("click", exportSummary);
+$("cvPng").addEventListener("click", () => exportPNGCombined([$("cvPlotFull"), $("cvPlotZoom")], "CV_with_Hupd.png"));
 $("lsvPng").addEventListener("click", () => exportPNG($("lsvPlot"), "LSV_ORR.png"));
 
 /* ===== Export CSV ===== */
