@@ -12,3 +12,6 @@ venv/
 # Temp files
 *.tmp
 *.bak
+analysis_output/
+ORR_LSV*.png
+CV*.png

@@ -93,22 +93,17 @@ def ir_correct(E_V, I_A, Ru_ohm: float) -> np.ndarray:
 # ----------------------------------------------------------------------
 # 4) 半波电位 E1/2（ORR 活性核心指标）
 # ----------------------------------------------------------------------
-def half_wave_potential(E, j) -> float:
-    """半波电位 E1/2（V）。约定 j 为阴极电流密度(负值)，
-    j_lim = min(j)（最负的扩散极限电流）；E1/2 取 j = j_lim/2 处电位，
-    在上升的阴极波上线性插值。找不到交叉点返回 nan。
+def half_wave_potential(E, j, j_lim=None) -> float:
+    """半波电位：自动平台中位数的一半；可显式传入 j_lim。
+
+    保留两参数接口；无可靠平台/交叉点时返回 nan，不再使用 min(j)。
     """
-    E = np.asarray(E, float)
-    j = np.asarray(j, float)
-    j_lim = np.nanmin(j)
-    target = j_lim / 2.0
-    order = np.argsort(E)
-    Es, js = E[order], j[order]
-    for i in range(len(Es) - 1):
-        a, b = js[i], js[i + 1]
-        if (a <= target <= b) or (b <= target <= a):
-            return float(Es[i] + (target - a) * (Es[i + 1] - Es[i]) / (b - a))
-    return float("nan")
+    from electrochem_analysis import detect_plateau, half_wave
+    if j_lim is None:
+        plateau = detect_plateau(E, j)
+        j_lim = plateau["jlim_mA_cm2"] if plateau else None
+    result = half_wave(E, j, j_lim)
+    return float("nan") if result is None else result
 
 
 # ----------------------------------------------------------------------
