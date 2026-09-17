@@ -39,7 +39,7 @@ CV_CSV = os.path.join(SAMPLE, "CV.csv")
 CV_XCOL, CV_YCOL = "1", "C"
 
 # —— B) .paax 原始文件链路 ——
-PAAX = r"D:\实验\催化剂\PtCo\有序化合金\分步还原\EC-30-PtCo-Step1\EC-30-PtCo-Step1.paax"
+PAAX = os.path.join(SAMPLE, "EC-30-PtCo-Step1.paax")
 
 OUT_LSV = os.path.join(HERE, "ORR_LSV.png")
 OUT_CV = os.path.join(HERE, "CV.png")
@@ -56,6 +56,7 @@ def _pick_traces(traces: dict):
     def is_cv(v):
         x = v["X"]
         d = np.diff(x)
+        d = d[d != 0]  # Potential holds at a reversal must not hide the turn.
         return np.sum(d[:-1] * d[1:] < 0) >= 1  # 至少一个转向（三角波）
 
     cv_keys = [k for k in pc if is_cv(pc[k]) and np.max(np.abs(pc[k]["Y"])) < 1e-4]
@@ -73,7 +74,7 @@ def main():
     fig_lsv = plot_orr_lsv(LSV_CONFIG)
     save_fig(fig_lsv, OUT_LSV)
     xc_raw, yc_raw = load_xy(CV_CSV, CV_XCOL, CV_YCOL)
-    xc, yc = select_stable_cycle(xc_raw, yc_raw)   # 只取稳定的一圈
+    xc, yc = select_stable_cycle(xc_raw, current_to_density(yc_raw, ELECTRODE_AREA_CM2))
     fig_cv = plot_cv(xc, yc, label="PtCo", color="#2ca02c")
     save_fig(fig_cv, OUT_CV)
 
@@ -85,7 +86,8 @@ def main():
     o2_j = current_to_density(o2["Y"], ELECTRODE_AREA_CM2)   # O2 电流密度
     n2_j = current_to_density(n2["Y"], ELECTRODE_AREA_CM2)   # N2 背景密度
     # 背景校正：把 N2 插值到 O2 的电位网格上相减
-    n2_j_on_o2 = np.interp(o2["X"], n2["X"], n2_j)
+    n2_order = np.argsort(n2["X"])
+    n2_j_on_o2 = np.interp(o2["X"], n2["X"][n2_order], n2_j[n2_order])
     o2_j_corr = o2_j - n2_j_on_o2                            # 校正后 O2
 
     fig_lsv2 = plot_orr_lsv([
@@ -106,7 +108,8 @@ def main():
 
     # ---------- 一致性校验：.paax 公式结果 vs CSV ----------
     csv_o2 = load_xy(os.path.join(SAMPLE, "O2LSV.csv"), "O2 Potential", "O2 Current Density")
-    csv_o2j = np.interp(o2["X"], csv_o2[0], csv_o2[1])  # 插值到 paax 网格
+    csv_order = np.argsort(csv_o2[0])
+    csv_o2j = np.interp(o2["X"], csv_o2[0][csv_order], csv_o2[1][csv_order])
     err = np.max(np.abs(o2_j - csv_o2j))
     print(f"[校验] .paax公式电流密度 与 CSV 电流密度 最大偏差 = {err:.4f} mA/cm² "
           f"(面积={ELECTRODE_AREA_CM2} cm²)")

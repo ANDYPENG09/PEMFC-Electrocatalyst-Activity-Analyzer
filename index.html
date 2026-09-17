@@ -264,7 +264,8 @@
       <input type="number" id="Ep" step="any" value="0.90">
     </div>
     <div class="field">
-      <label>j<sub>lim</sub> Evaluation Potential (V)</label>
+      <label>Manual j<sub>lim</sub> Evaluation Potential (V)</label>
+      <select id="jlimMode" aria-label="Limiting current method"><option value="auto">Auto diffusion plateau (recommended)</option><option value="manual">Manual potential (legacy)</option></select>
       <input type="number" id="jlimE" step="any" value="0.40">
     </div>
   </div>
@@ -328,10 +329,186 @@
   </div>
 </div>
 
+<!-- WORKBENCH START -->
+<section class="card" id="workbench">
+  <div class="card-title">Analysis Workbench · 自动 QC / 多样品比较</div>
+  <p class="hint">Capture the current CV/O₂/N₂ inputs, or import sample JSON files. Each capture is a snapshot; recapture after changing inputs. Analysis uses cathodic currents and a continuous diffusion plateau. Missing results are shown as —.</p>
+  <div class="grid g-4">
+    <div class="field"><label for="wbName">Sample ID</label><input id="wbName" value="Sample-1"></div>
+    <div class="field"><label for="wbRef">Input potential reference</label><select id="wbRef"><option>RHE</option><option>SHE</option><option>AgAgCl_satKCl</option><option>AgAgCl_3M</option><option>SCE</option><option>MSE</option></select></div>
+    <div class="field"><label for="wbPH">pH (25 °C)</label><input id="wbPH" type="number" value="0" step="any"></div>
+    <div class="field"><label for="wbRu">Additional uncompensated Ru (Ω)</label><input id="wbRu" type="number" value="0" min="0" step="any"></div>
+  </div>
+  <p class="hint">RHE conversion and E − I·Ru apply only to captured workbench data. Use Ru = 0 if already corrected. Hupd bounds above are interpreted in V vs RHE here. Original manual calculators remain available.</p>
+  <div class="grid g-4">
+    <div class="field"><label for="wbWidth">Minimum plateau width (V)</label><input id="wbWidth" type="number" value="0.08" min="0.001" step="0.01"></div>
+    <div class="field"><label for="wbSlope">Plateau slope / amplitude (V⁻¹)</label><input id="wbSlope" type="number" value="0.15" min="0.001" step="0.01"></div>
+    <div class="field"><label for="wbTafelLo">Tafel lower bound (V RHE)</label><input id="wbTafelLo" type="number" value="0.85" step="0.01"></div>
+    <div class="field"><label for="wbTafelHi">Tafel upper bound (V RHE)</label><input id="wbTafelHi" type="number" value="0.95" step="0.01"></div>
+  </div>
+  <div class="btn-row"><button class="btn" id="wbCapture">Analyze &amp; add current sample</button><button class="btn btn-secondary" id="wbDemo">Load two-sample demo</button><button class="btn btn-danger" id="wbClear">Clear comparison</button></div>
+  <div class="field"><label for="wbFiles">Import one or more sample JSON files (see README schema)</label><input type="file" id="wbFiles" accept=".json" multiple></div>
+  <p id="wbMessage" role="status" aria-live="polite"></p>
+  <div style="overflow-x:auto"><table class="summary" id="wbTable"></table></div>
+  <p id="wbLegend" class="hint"></p>
+  <div class="grid g-2"><div class="plot" id="wbCvPlot"></div><div class="plot" id="wbOrrPlot"></div></div>
+  <div id="wbQC"></div>
+  <div class="btn-row" id="wbDownloads"></div>
+  <button class="btn btn-secondary" id="wbPlotDownload">Download comparison plots</button>
+</section>
+<section class="card">
+  <div class="card-title">Multi-rpm Koutecký–Levich · 多转速拟合</div>
+  <p class="hint">Paste/import CSV: rpm,potential_V_RHE,j_mA_cm2. Supply a single corrected ORR sweep per rpm, at least three distinct speeds. Values must already be in V vs RHE and mA/cm²; no background or potential correction is applied here.</p>
+  <textarea id="klText" aria-label="Multi-rpm CSV" placeholder="rpm,potential_V_RHE,j_mA_cm2&#10;400,0.895,-1.5&#10;400,0.905,-1.4"></textarea>
+  <div class="field"><label for="klFiles">Import one or more multi-rpm CSV files</label><input type="file" id="klFiles" accept=".csv,.txt" multiple></div>
+  <div class="grid g-4">
+    <div class="field"><label for="klE">Fit potential (V RHE)</label><input id="klE" type="number" value="0.9" step="0.01"></div>
+    <div class="field"><label for="klD">O₂ diffusion D (cm²/s), optional</label><input id="klD" type="number" step="any" placeholder="e.g. 1.9e-5"></div>
+    <div class="field"><label for="klNu">Kinematic viscosity ν (cm²/s)</label><input id="klNu" type="number" step="any" placeholder="e.g. 0.01"></div>
+    <div class="field"><label for="klC">O₂ concentration C (mol/cm³)</label><input id="klC" type="number" step="any" placeholder="e.g. 1.2e-6"></div>
+  </div>
+  <div class="btn-row"><button class="btn" id="klRun">Fit K–L</button><button class="btn btn-secondary" id="klDemo">Load K–L demo</button><button class="btn btn-secondary" id="klDownload">Download K–L JSON</button></div>
+  <pre id="klResult" style="white-space:pre-wrap" aria-live="polite"></pre><div class="plot" id="klPlot"></div>
+</section>
+<!-- WORKBENCH END -->
 <footer>MIT License &middot; Author: ANDYPENG09 &middot; Pure HTML/JS &middot; Offline &middot; No Origin Required</footer>
 
 </div>
 
+<!-- ANALYSIS CORE START -->
+<script>
+/* Pure offline analysis core. Keep numerical rules aligned with electrochem_analysis.py. */
+const ECAnalysis = (() => {
+  const defaults = {min_width_V:0.08,min_points:7,slope_fraction_per_V:0.15,max_gap_V:0.025,
+    transport_ratio:0.8,stability_fraction:0.05,sensitivity_fraction:0.1};
+  const resultFields=['sample_id','ecsa_m2_g','ehalf_V','jlim_mA_cm2','ma_0_9V_A_mg','sa_0_9V_mA_cm2_Pt','tafel_mV_dec','qc_status'];
+  const cvFields=['sample_id','point_index','potential_V_RHE','j_mA_cm2'];
+  const orrFields=['sample_id','point_index','potential_V_RHE','j_raw_mA_cm2','j_background_mA_cm2','j_corrected_mA_cm2','in_plateau'];
+  const mean=a=>a.reduce((s,v)=>s+v,0)/a.length;
+  function quantile(a,q){const b=[...a].sort((a,b)=>a-b),p=(b.length-1)*q,k=Math.floor(p);return b[k]+(b[Math.min(k+1,b.length-1)]-b[k])*(p-k);}
+  const median=a=>quantile(a,0.5);
+  function validateOptions(cfg){if(Object.values(cfg).some(v=>!Number.isFinite(v)||v<=0))throw Error('QC thresholds must be finite and positive');if(!Number.isInteger(cfg.min_points)||cfg.min_points<3||cfg.transport_ratio>=1)throw Error('Use min_points >=3 and transport_ratio <1');}
+  function curve(E,j){
+    if(!Array.isArray(E)||!Array.isArray(j)||E.length!==j.length||E.length<2||![...E,...j].every(Number.isFinite)) throw Error('A curve needs finite paired points');
+    if(E.slice(1).every((v,i)=>v<E[i])) return [[...E].reverse(),[...j].reverse()];
+    if(!E.slice(1).every((v,i)=>v>E[i])) throw Error('Use one monotonic sweep with unique potentials');
+    return [[...E],[...j]];
+  }
+  function interp(x,y,t,gap=0.025){
+    if(t<x[0]||t>x.at(-1))return null;
+    let k=x.findIndex(v=>v>=t);
+    if(Math.abs(x[k]-t)<1e-12)return y[k];
+    if(k===0||x[k]-x[k-1]>gap)return null;
+    return y[k-1]+(t-x[k-1])*(y[k]-y[k-1])/(x[k]-x[k-1]);
+  }
+  function plateau(E,j,options={}){
+    const cfg={...defaults,...options},[x,y]=curve(E,j);
+    validateOptions(cfg);
+    const smooth=y.map((_,i)=>median(y.slice(Math.max(0,i-2),i+3)));
+    const amplitude=-quantile(smooth,0.1);
+    if(amplitude<=0||Math.max(...smooth)-Math.min(...smooth)<0.3*amplitude)return null;
+    const mask=smooth.map((v,i)=>{const a=Math.max(0,i-2),b=Math.min(x.length-1,i+2);return Math.abs((smooth[b]-smooth[a])/(x[b]-x[a]))<=amplitude*cfg.slope_fraction_per_V&&v< -0.6*amplitude;});
+    const candidates=[];let start=null;
+    for(let i=0;i<=x.length;i++){
+      const eligible=i<x.length&&mask[i],gap=i>0&&i<x.length&&x[i]-x[i-1]>cfg.max_gap_V;
+      if(start!==null&&(!eligible||gap)){
+        const end=i-1;
+        if(end-start+1>=cfg.min_points&&x[end]-x[start]>=cfg.min_width_V){
+          const vals=y.slice(start,end+1),med=median(vals),avg=mean(vals);
+          candidates.push({start_V:x[start],end_V:x[end],jlim_mA_cm2:med,mad_mA_cm2:median(vals.map(v=>Math.abs(v-med))),std_mA_cm2:Math.sqrt(mean(vals.map(v=>(v-avg)**2))),count:vals.length});
+        }start=null;
+      }if(eligible&&start===null)start=i;
+    }
+    if(!candidates.length)return null;
+    const best=candidates.reduce((a,b)=>b.end_V-b.start_V>a.end_V-a.start_V?b:a);
+    return {...best,candidates,method:'contiguous_low_derivative_median'};
+  }
+  function halfWave(E,j,jl){
+    const [x,y]=curve(E,j);if(jl===null||!Number.isFinite(jl)||jl>=0)return null;
+    for(let i=0;i<x.length-1;i++)if(y[i]<=jl/2&&jl/2<y[i+1]&&x[i+1]-x[i]<=defaults.max_gap_V)return x[i]+(jl/2-y[i])*(x[i+1]-x[i])/(y[i+1]-y[i]);
+    return null;
+  }
+  function kinetic(j,jl){return j===null||jl===null||j>=0||jl>=0||Math.abs(j)>=Math.abs(jl)?null:Math.abs(j)*Math.abs(jl)/(Math.abs(jl)-Math.abs(j));}
+  function sweeps(x,y){
+    if(x.length!==y.length||x.length<2||![...x,...y].every(Number.isFinite))throw Error('Invalid CV points');
+    const out=[];let start=0,direction=0;
+    for(let i=1;i<x.length;i++){const sign=Math.sign(x[i]-x[i-1]);if(sign&&direction&&sign!==direction){if(i-start>=3)out.push([x.slice(start,i),y.slice(start,i)]);start=i-1;}if(sign)direction=sign;}
+    if(x.length-start>=3)out.push([x.slice(start),y.slice(start)]);return out;
+  }
+  function cvAnalysis(cv,loading){
+    const empty={ecsa_m2_g:null,stability_fraction:null,anodic_sweeps:0};if(!cv)return empty;
+    const [lo,hi]=cv.hupd_range_V||[0.05,0.4],rate=cv.scan_rate_V_s??0.02,q=cv.q_mC_cm2??0.21;
+    if(![rate,q,lo,hi].every(Number.isFinite)||rate<=0||q<=0||lo>=hi)throw Error('Invalid CV integration parameters');
+    const branches=sweeps(cv.E,cv.j).filter(([x])=>x.at(-1)>x[0]&&x[0]<=lo&&x.at(-1)>=hi).map(([x,y])=>{const keep=x.map((v,i)=>i===0||v>x[i-1]);return [x.filter((v,i)=>keep[i]),y.filter((v,i)=>keep[i])];});
+    if(!branches.length)return empty;
+    const [x,y]=branches.at(-1),baseline=cv.baseline_mA_cm2??interp(x,y,hi,Infinity);
+    if(!Number.isFinite(baseline))throw Error('CV baseline must be finite');
+    const xx=[lo,...x.filter(v=>v>lo&&v<hi),hi],yy=xx.map(v=>Math.max(0,interp(x,y,v,Infinity)-baseline));
+    let sh=0;for(let i=1;i<xx.length;i++)sh+=(xx[i]-xx[i-1])*(yy[i]+yy[i-1])/2;
+    let stability=null;
+    if(branches.length>=2){const [a,b]=branches.slice(-2),l=Math.max(a[0][0],b[0][0]),h=Math.min(a[0].at(-1),b[0].at(-1)),grid=Array.from({length:101},(_,i)=>l+(h-l)*i/100),ya=grid.map(v=>interp(...a,v,Infinity)),yb=grid.map(v=>interp(...b,v,Infinity));stability=Math.sqrt(mean(ya.map((v,i)=>(v-yb[i])**2)))/Math.max(Math.sqrt(mean(yb.map(v=>v*v))),1e-12);}
+    return {ecsa_m2_g:loading&&sh>0?100*sh/(q*rate*loading*1000):null,stability_fraction:stability,anodic_sweeps:branches.length,SH_mA_V_cm2:sh,baseline_mA_cm2:baseline};
+  }
+  function fitLine(x,y){
+    const mx=mean(x),my=mean(y),den=x.reduce((s,v)=>s+(v-mx)**2,0);if(x.length<2||den<1e-24)throw Error('Insufficient independent fit points');
+    const slope=x.reduce((s,v,i)=>s+(v-mx)*(y[i]-my),0)/den,intercept=my-slope*mx,total=y.reduce((s,v)=>s+(v-my)**2,0);
+    return {slope,intercept,r2:total>1e-24?1-y.reduce((s,v,i)=>s+(v-slope*x[i]-intercept)**2,0)/total:null};
+  }
+  function klFit(traces,potential_V=0.9,D_cm2_s=null,nu_cm2_s=null,C_mol_cm3=null){
+    if(!Number.isFinite(potential_V))throw Error('K-L potential must be finite');
+    const rpm=[],currents=[];
+    for(const t of traces){if(!Number.isFinite(t.rpm)||t.rpm<=0||rpm.includes(t.rpm))throw Error('K-L requires distinct positive rpm');const [x,y]=curve(t.E,t.j),j=interp(x,y,potential_V);if(j===null||j>=0)throw Error('K-L needs a covered potential and negative ORR current at every rpm');rpm.push(t.rpm);currents.push(j);}
+    if(rpm.length<3)throw Error('K-L requires at least three distinct rpm');
+    const xs=rpm.map(v=>(2*Math.PI*v/60)**-0.5),ys=currents.map(v=>1/v),fit=fitLine(xs,ys),valid=fit.slope< -1e-12&&fit.intercept< -1e-12,reasons=valid?[]:['Nonphysical slope/intercept; jk and n unavailable'];
+    if(fit.r2===null||fit.r2<0.98)reasons.push('K-L R2 below 0.98 or undefined');
+    let n=null;const params=[D_cm2_s,nu_cm2_s,C_mol_cm3];
+    if(params.some(v=>v!==null&&(!Number.isFinite(v)||v<=0)))throw Error('Transport parameters must be finite and positive');
+    if(valid&&params.every(v=>v!==null)){n=1/(Math.abs(fit.slope)*1000*0.620*96485.33212*D_cm2_s**(2/3)*nu_cm2_s**(-1/6)*C_mol_cm3);if(n>4.2||n<1)reasons.push('Estimated ORR electron number outside 1–4.2; review assumptions');}
+    else if(params.some(v=>v===null))reasons.push('n unavailable: supply D, kinematic viscosity and oxygen concentration');
+    return {...fit,potential_V,jk_mA_cm2:valid?1/fit.intercept:null,n,rpm,j_mA_cm2:currents,omega_inv_sqrt:xs,inverse_j:ys,status:!valid?'Invalid':reasons.length?'Check recommended':'Good',reasons,D_cm2_s,nu_cm2_s,C_mol_cm3};
+  }
+  function analyzeSample(sample){
+    const sid=String(sample.sample_id),cfg={...defaults,...sample.qc_options},loading=sample.loading_mg_cm2??null;
+    validateOptions(cfg);
+    if(loading!==null&&(!Number.isFinite(loading)||loading<=0))throw Error('Pt loading must be finite and positive');
+    const [x,raw]=curve(sample.orr.E,sample.orr.j),checks=[];
+    const check=(code,status,reason,value=null)=>checks.push({code,status,reason,value});let bg=null;
+    if(sample.n2){const [nx,ny]=curve(sample.n2.E,sample.n2.j),values=x.map(e=>interp(nx,ny,e));if(values.some(v=>v===null))check('n2_background','Invalid','N2 does not cover the full O2 sweep without gaps');else{bg=values;check('n2_background','Good','N2 background subtracted');}}
+    else check('n2_background','Check recommended','N2 background unavailable; ORR remains uncorrected');
+    const y=raw.map((v,i)=>v-(bg?bg[i]:0)),p=plateau(x,y,cfg),jl=p?p.jlim_mA_cm2:null;
+    check('plateau',p?'Good':'Invalid',p?'Continuous low-derivative cathodic plateau detected':'No resolved diffusion plateau; no min(j) fallback',p);
+    const cv=cvAnalysis(sample.cv,loading),stability=cv.stability_fraction;
+    check('cv_stability',stability!==null&&stability<=cfg.stability_fraction?'Good':'Check recommended',stability!==null?'Last two comparable anodic sweeps RMS difference':'At least two complete anodic sweeps required',stability);
+    const j09=interp(x,y,0.9),ratio=j09!==null&&jl?Math.abs(j09/jl):null,jk=kinetic(j09,jl);
+    check('transport_0_9V',jk===null?'Invalid':ratio>=cfg.transport_ratio?'Check recommended':'Good',jk===null?'0.9 V missing, wrong current sign, or |j| >= |jlim|':'|j(0.9V)| / |jlim|; review at >=0.8',ratio);
+    const variants=[];
+    if(p){const vals=y.filter((_,i)=>x[i]>=p.start_V&&x[i]<=p.end_V);variants.push(quantile(vals,0.1),quantile(vals,0.9));for(const f of [0.5,1.5]){const alt=plateau(x,y,{...cfg,slope_fraction_per_V:cfg.slope_fraction_per_V*f});if(alt)variants.push(...alt.candidates.map(c=>c.jlim_mA_cm2));}}
+    const jlSens=variants.length?Math.max(...variants.map(v=>Math.abs(v-jl)/Math.abs(jl))):null,ks=variants.map(v=>kinetic(j09,v)),goodKs=ks.filter(v=>v!==null),maSens=jk&&goodKs.length?Math.max(...goodKs.map(v=>Math.abs(v-jk)/jk)):null,singular=ks.length>0&&ks.some(v=>v===null);
+    check('plateau_sensitivity',singular?'Invalid':maSens!==null&&Math.max(jlSens,maSens)<=cfg.sensitivity_fraction?'Good':'Check recommended','Compare plateau P10/P90 and derivative thresholds x0.5/x1.5; MA sensitivity equals jk sensitivity',{jlim_relative:jlSens,ma_relative:maSens,singular});
+    const ecsa=cv.ecsa_m2_g;if(loading===null||ecsa===null)check('normalization','Check recommended','MA requires Pt loading; SA requires positive Hupd ECSA');
+    const ehalf=halfWave(x,y,jl);check('ehalf',ehalf!==null?'Good':'Invalid',ehalf!==null?'Half-plateau rising crossing':'Half-wave crossing not resolved');
+    const [lo,hi]=sample.tafel_range_V||[0.85,0.95],tx=[],ty=[];
+    if(![lo,hi].every(Number.isFinite)||lo>=hi)throw Error('Invalid Tafel potential range');
+    x.forEach((e,i)=>{const k=kinetic(y[i],jl);if(lo<=e&&e<=hi&&k&&Math.abs(y[i]/jl)<cfg.transport_ratio){tx.push(Math.log10(k));ty.push(e);}});
+    let tf=null;if(tx.length>=5&&Math.max(...tx)-Math.min(...tx)>=0.3){const fit=fitLine(tx,ty);if(fit.slope<0)tf={...fit,slope_mV_dec:Math.abs(fit.slope)*1000,count:tx.length,range_V:[lo,hi]};}
+    check('tafel',tf&&tf.r2!==null&&tf.r2>=0.98?'Good':'Check recommended','Kinetic-current Tafel fit; >=5 points and >=0.3 decades required',tf);
+    if(p&&p.std_mA_cm2/Math.abs(jl)>0.05)check('plateau_dispersion','Check recommended','Plateau standard deviation exceeds 5% of |jlim|');
+    const status=checks.some(c=>c.status==='Invalid')?'Invalid':checks.some(c=>c.status==='Check recommended')?'Check recommended':'Good';
+    const metrics={ecsa_m2_g:ecsa,ehalf_V:ehalf,jlim_mA_cm2:jl,ma_0_9V_A_mg:jk&&loading?jk/1000/loading:null,sa_0_9V_mA_cm2_Pt:jk&&ecsa&&loading?jk/(ecsa*loading*10):null,tafel_mV_dec:tf?tf.slope_mV_dec:null};
+    const row=(fields,vals)=>Object.fromEntries(fields.map((k,i)=>[k,vals[i]]));
+    return {sample_id:sid,metrics,qc:{status,checks},plateau:p,cv,tafel:tf,metadata:sample.metadata||{},settings:{loading_mg_cm2:loading,qc_options:cfg,tafel_range_V:[lo,hi],cv:Object.fromEntries(Object.entries(sample.cv||{}).filter(([k])=>!['E','j'].includes(k)))},
+      processed_cv:(sample.cv?.E||[]).map((e,i)=>row(cvFields,[sid,i,e,sample.cv.j[i]])),
+      processed_orr:x.map((e,i)=>row(orrFields,[sid,i,e,raw[i],bg?bg[i]:null,y[i],!!(p&&p.start_V<=e&&e<=p.end_V)]))};
+  }
+  function analyzeBatch(samples){const ids=samples.map(s=>String(s.sample_id));if(!ids.length||ids.some(s=>!s.trim())||new Set(ids).size!==ids.length)throw Error('Provide nonempty, unique sample IDs');return {schema_version:'1.0.0',units:{potential:'V vs RHE',current_density:'mA/cm2',loading:'mgPt/cm2'},samples:samples.map(analyzeSample)};}
+  function csv(fields,rows){const cell=v=>v===null||v===undefined?'':typeof v==='boolean'?(v?'True':'False'):'"'+String(v).replaceAll('"','""')+'"';return [fields.join(','),...rows.map(r=>fields.map(k=>cell(r[k])).join(','))].join('\r\n')+'\r\n';}
+  function exports(analysis){return {'analysis.json':JSON.stringify(analysis,null,2),'results.csv':csv(resultFields,analysis.samples.map(s=>({sample_id:s.sample_id,...s.metrics,qc_status:s.qc.status}))),'processed_cv.csv':csv(cvFields,analysis.samples.flatMap(s=>s.processed_cv)),'processed_orr.csv':csv(orrFields,analysis.samples.flatMap(s=>s.processed_orr))};}
+  return {defaults,plateau,halfWave,kinetic,curve,interp,sweeps,cvAnalysis,klFit,analyzeSample,analyzeBatch,exports,resultFields};
+})();
+if(typeof module!=='undefined')module.exports=ECAnalysis;
+
+</script>
+<!-- ANALYSIS CORE END -->
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
@@ -1876,6 +2053,7 @@ function updateSummary(){
 /* ===== LSV ===== */
 let lsvResult = null;
 $("lsvBtn").addEventListener("click", () => {
+  try {
   const A = num("area"); if (isNaN(A)){ $("lsvMsg").textContent = "RDE area not provided"; return; }
   const o2 = parse2col($("lsvText").value, $("o2PotUnit").value, $("o2CurUnit").value);
   if (o2.length < 2){ $("lsvMsg").textContent = "Insufficient O\u2082 data"; return; }
@@ -1898,24 +2076,35 @@ $("lsvBtn").addEventListener("click", () => {
   // Savitzky-Golay smoothing (window 7, 2nd-order) to reduce N₂-correction noise
   corrected = sgSmooth(corrected, 7);
   const jlimE = num("jlimE");
-  const jlim = !isNaN(jlimE) ? interp(jlimE, X, corrected) : Math.min(...corrected);
+  const plateau = ECAnalysis.plateau(X, corrected);
+  const autoPlateau = $("jlimMode").value === "auto";
+  const jlim = autoPlateau ? (plateau ? plateau.jlim_mA_cm2 : NaN) : (!isNaN(jlimE) ? ECAnalysis.interp(X, corrected, jlimE) : NaN);
+  const ehalf = ECAnalysis.halfWave(X, corrected, Number.isFinite(jlim) ? jlim : null);
   const E = num("Ep");
   const jE = !isNaN(E) ? interp(E, X, corrected) : NaN;
-  $("jlim").value = Math.abs(jlim).toFixed(4);
+  $("jlim").value = Number.isFinite(jlim) ? Math.abs(jlim).toFixed(4) : "";
   if (!isNaN(jE)) $("jE").value = jE.toFixed(4);
-  $("lsvMsg").textContent = `j_lim@${isNaN(jlimE)?"min":jlimE.toFixed(2)}V = ${jlim.toFixed(3)} mA/cm\u00B2, ` +
+  $("lsvMsg").textContent = (autoPlateau ? (plateau ? `Plateau ${plateau.start_V.toFixed(3)}–${plateau.end_V.toFixed(3)} V; median ${jlim.toFixed(3)}, SD ${plateau.std_mA_cm2.toFixed(3)} mA/cm²; ` : "Invalid: no diffusion plateau. ") : `Manual jlim = ${Number.isFinite(jlim)?jlim.toFixed(3):"unavailable"}; `) + `E1/2 = ${ehalf===null?"unavailable":ehalf.toFixed(4)} V; ` +
     (isNaN(jE)?"":`j@${E.toFixed(2)}V = ${jE.toFixed(3)} mA/cm\u00B2, `) + (n2txt ? "N\u2082-corrected." : "No N\u2082 correction.");
   calcORR();
   lsvResult = { X, Y: corrected };
   const mk = [];
-  if (!isNaN(jlimE)) mk.push({ x: jlimE, y: jlim, color: "#d70015", label: "j_lim" });
+  if (Number.isFinite(jlim)) mk.push({ x: autoPlateau ? (plateau.start_V+plateau.end_V)/2 : jlimE, y: jlim, color: "#d70015", label: "j_lim" });
   if (!isNaN(E)) mk.push({ x: E, y: jE, color: "#0071e3", label: "j@E" });
   lastLsvX = X; lastLsvY = corrected;
   svgChart($("lsvPlot"), [{ x: X, y: corrected, color: "#00875a" }], Object.assign({
     title: "LSV (N\u2082-corrected)", xlabel: "E (V vs RHE)", ylabel: "J (mA/cm\u00B2)",
-    markers: mk
+    markers: mk,
+    regions: autoPlateau && plateau ? [{x0:plateau.start_V,x1:plateau.end_V,color:"#00875a"}] : []
   }, lsvYOpt()));
   $("lsvPlot").style.display = "block";
+  } catch (error) {
+    $("lsvMsg").textContent = `Invalid: ${error.message}`;
+    $("jlim").value = ""; $("jE").value = "";
+    $("lsvPlot").style.display = "none";
+    lsvResult = null;
+    calcORR();
+  }
 });
 
 /* ===== Clear ===== */
@@ -2175,5 +2364,102 @@ $("loadExample").addEventListener("click", loadExampleData);
 /* Initialize */
 document.querySelector('.frac-tag[data-f="30"]').classList.add("active");
 </script>
+<!-- WORKBENCH SCRIPT START -->
+<script>
+/* Workbench UI: source embedded by build_html.py, no external runtime dependency. */
+(() => {
+  let samples=[],analysis=null,kl=null;
+  const colors=['#0071e3','#d70015','#00875a','#8b42bd','#b07800','#007f8b'];
+  const text=(tag,value,parent)=>{const e=document.createElement(tag);e.textContent=value;parent.append(e);return e;};
+  const display=v=>v===null||v===undefined?'—':typeof v==='number'?v.toPrecision(6):String(v);
+  function checkDetail(c){
+    const v=c.value;if(v===null||c.code==='plateau')return '';
+    if(c.code==='cv_stability')return ` Difference: ${(100*v).toFixed(2)}%.`;
+    if(c.code==='transport_0_9V')return ` Ratio: ${(100*v).toFixed(2)}%.`;
+    if(c.code==='plateau_sensitivity')return ` jlim change: ${v.jlim_relative===null?'unavailable':(100*v.jlim_relative).toFixed(2)+'%'}; MA change: ${v.ma_relative===null?'unavailable':(100*v.ma_relative).toFixed(2)+'%'}${v.singular?'; singular correction encountered':''}.`;
+    if(c.code==='tafel')return ` ${display(v.slope_mV_dec)} mV/dec; R² ${display(v.r2)}; ${v.count} points.`;
+    return '';
+  }
+  function download(name,content){const url=URL.createObjectURL(new Blob([content],{type:name.endsWith('.json')?'application/json':'text/csv;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+  function snapshot(){
+    const area=num('area'),loading=computePtLoad()/1000,ref=$('wbRef').value,pH=num('wbPH'),ru=num('wbRu');
+    if(!(area>0)||!Number.isFinite(pH)||!(ru>=0))throw Error('Check area, pH and Ru');
+    const offsets={RHE:0,SHE:0,AgAgCl_satKCl:0.197,AgAgCl_3M:0.210,SCE:0.241,MSE:0.640};
+    const shift=ref==='RHE'?0:offsets[ref]+8.314462618*298.15/96485.33212*2.302585093*pH;
+    const read=(id,pot,cur)=>{const rows=parse2col($(id).value,$(pot).value,$(cur).value);return {E:rows.map(r=>r[0]+shift-r[1]*ru),j:rows.map(r=>r[1]*1000/area)};};
+    const s={sample_id:$('wbName').value.trim(),loading_mg_cm2:loading,orr:read('lsvText','o2PotUnit','o2CurUnit'),
+      qc_options:{min_width_V:num('wbWidth'),slope_fraction_per_V:num('wbSlope')},tafel_range_V:[num('wbTafelLo'),num('wbTafelHi')],
+      metadata:{source:'browser_capture',reference:ref,pH,temperature_K:298.15,additional_Ru_ohm:ru,area_cm2:area}};
+    if($('n2Text').value.trim()){
+      let n=read('n2Text','o2PotUnit','n2CurUnit');
+      // Preserve the original N2 full-CV workflow by selecting the last forward branch.
+      if(!n.E.slice(1).every((v,i)=>v>n.E[i])&&!n.E.slice(1).every((v,i)=>v<n.E[i])){
+        const branches=ECAnalysis.sweeps(n.E,n.j).filter(([x])=>x.at(-1)>x[0]);
+        if(!branches.length)throw Error('No forward N2 sweep');const [E,j]=branches.at(-1);n={E,j};s.metadata.n2_selection='last_anodic_sweep';
+      }s.n2=n;
+    }
+    if($('cvText').value.trim()){
+      s.cv={...read('cvText','cvPotUnit','cvCurUnit'),scan_rate_V_s:scanRateV(),q_mC_cm2:qspecCmC(),hupd_range_V:[num('hlo'),num('hhi')]};
+      if($('baselineMode').value==='manual'&&$('baseline').value.trim())s.cv.baseline_mA_cm2=num('baseline');
+    }return s;
+  }
+  function render(){
+    $('wbTable').replaceChildren();$('wbQC').replaceChildren();$('wbLegend').replaceChildren();$('wbDownloads').replaceChildren();
+    for(const id of ['wbCvPlot','wbOrrPlot'])$(id).replaceChildren();
+    if(!analysis)return;
+    const head=text('tr','',$('wbTable'));
+    ['Sample','ECSA (m²/gPt)','E1/2 (V)','jlim (mA/cm²)','MA@0.9V (A/mgPt)','SA@0.9V (mA/cm²Pt)','Tafel (mV/dec)','QC',''].forEach(v=>text('th',v,head));
+    analysis.samples.forEach((s,i)=>{
+      const row=text('tr','',$('wbTable'));
+      [s.sample_id,...ECAnalysis.resultFields.slice(1,-1).map(k=>s.metrics[k]),s.qc.status].forEach(v=>text('td',display(v),row));
+      const remove=text('button','Remove',text('td','',row));remove.className='btn btn-secondary';remove.onclick=()=>commit(samples.filter(t=>t.sample_id!==s.sample_id));
+      const legend=text('span',`${s.sample_id}  `,$('wbLegend'));legend.style.color=colors[i%colors.length];
+      const detail=text('details','',$('wbQC'));text('summary',`${s.sample_id} — ${s.qc.status}`,detail);
+      if(s.plateau)text('p',`Plateau: ${display(s.plateau.start_V)}–${display(s.plateau.end_V)} V; median ${display(s.plateau.jlim_mA_cm2)}; MAD ${display(s.plateau.mad_mA_cm2)}; SD ${display(s.plateau.std_mA_cm2)} mA/cm²`,detail);
+      const list=text('ul','',detail);s.qc.checks.forEach(c=>text('li',`${c.status}: ${c.reason}${checkDetail(c)}`,list));
+    });
+    for(const [id,key,jkey,title] of [['wbCvPlot','processed_cv','j_mA_cm2','CV comparison'],['wbOrrPlot','processed_orr','j_corrected_mA_cm2','ORR comparison']]){
+      const series=analysis.samples.map((s,i)=>({x:s[key].map(r=>r.potential_V_RHE),y:s[key].map(r=>r[jkey]),color:colors[i%colors.length]})).filter(s=>s.x.length);
+      if(series.length)svgChart($(id),series,{title,xlabel:'E (V vs RHE)',ylabel:'j (mA/cm²)'});
+    }
+    for(const name of ['analysis.json','results.csv','processed_cv.csv','processed_orr.csv']){
+      const b=text('button',`Download ${name}`,$('wbDownloads'));b.className='btn btn-secondary';b.onclick=()=>download(name,ECAnalysis.exports({...analysis,...(kl?{kl}:{})})[name]);
+    }
+  }
+  function commit(next){const result=next.length?ECAnalysis.analyzeBatch(next):null;samples=next;analysis=result;render();$('wbMessage').textContent=`${samples.length} sample(s) analyzed. Results are snapshots.`;}
+  function guarded(fn){return async()=>{try{await fn();}catch(e){$('wbMessage').textContent=e.message;}};}
+  $('wbCapture').onclick=guarded(()=>{const s=snapshot();if(samples.some(t=>t.sample_id===s.sample_id))throw Error('Sample ID already exists. Remove it or use a new ID.');commit([...samples,s]);});
+  $('wbClear').onclick=()=>commit([]);
+  $('wbFiles').onchange=guarded(async()=>{const added=[];for(const f of $('wbFiles').files){const p=JSON.parse(await f.text());added.push(...(p.samples||[p]));}commit([...samples,...added]);$('wbFiles').value='';});
+  $('wbPlotDownload').onclick=()=>{if(analysis)exportPNGCombined([$('wbCvPlot'),$('wbOrrPlot')],'comparison.png');};
+  function demoSample(id,center){
+    const E=Array.from({length:201},(_,i)=>0.2+i*0.004),j=E.map(e=>-6/(1+Math.exp((e-center)/0.025)));
+    const ce=[],cj=[];for(let cycle=0;cycle<3;cycle++){for(let i=0;i<100;i++){const e=i/100;ce.push(e);cj.push(0.08+0.7*Math.exp(-(((e-0.18)/0.07)**2)));}for(let i=100;i>0;i--){ce.push(i/100);cj.push(-0.08);}}ce.push(0);cj.push(0.08);
+    return {sample_id:id,orr:{E,j},n2:{E,j:E.map(()=>0)},cv:{E:ce,j:cj,scan_rate_V_s:0.02},loading_mg_cm2:0.02,metadata:{synthetic:true}};
+  }
+  $('wbDemo').onclick=guarded(()=>commit([demoSample('Demo-Pt',0.85),demoSample('Demo-PtCo',0.87)]));
+  function parseKL(input){
+    const groups=new Map();
+    for(const [index,line] of input.trim().split(/\r?\n/).entries()){
+      if(!line.trim()||/^rpm[,\s]/i.test(line.trim()))continue;
+      const values=line.trim().split(/[,\s]+/).map(Number);if(values.length!==3||!values.every(Number.isFinite))throw Error(`Invalid K-L CSV row ${index+1}`);
+      const [rpm,e,j]=values;if(!groups.has(rpm))groups.set(rpm,{rpm,E:[],j:[]});groups.get(rpm).E.push(e);groups.get(rpm).j.push(j);
+    }return [...groups.values()];
+  }
+  function invalidateKL(){kl=null;$('klPlot').replaceChildren();$('klResult').textContent='Inputs changed. Run Fit K–L to refresh results.';}
+  ['klText','klE','klD','klNu','klC'].forEach(id=>$(id).addEventListener('input',invalidateKL));
+  $('klFiles').onchange=async()=>{try{const rows=[];for(const f of $('klFiles').files)rows.push(await f.text());$('klText').value=rows.join('\n');invalidateKL();}catch(e){$('klResult').textContent=e.message;}};
+  $('klRun').onclick=()=>{
+    invalidateKL();try{const optional=id=>$(id).value.trim()?num(id):null;kl=ECAnalysis.klFit(parseKL($('klText').value),num('klE'),optional('klD'),optional('klNu'),optional('klC'));
+      $('klResult').textContent=`${kl.status}\nslope: ${display(kl.slope)} (cm²/mA)(rad/s)^½\nintercept: ${display(kl.intercept)} cm²/mA\nR²: ${display(kl.r2)}\njk: ${display(kl.jk_mA_cm2)} mA/cm² (signed)\nn: ${display(kl.n)}\n${kl.reasons.join('\n')}`;
+      const x=[...kl.omega_inv_sqrt].sort((a,b)=>a-b);svgChart($('klPlot'),[{x:kl.omega_inv_sqrt,y:kl.inverse_j,color:'#0071e3'},{x,y:x.map(v=>kl.slope*v+kl.intercept),color:'#d70015',dashed:true}],{title:'Koutecky–Levich fit',xlabel:'omega^(-1/2) (rad/s)^(-1/2)',ylabel:'1/j (cm²/mA)'});
+    }catch(e){$('klResult').textContent=e.message;}
+  };
+  $('klDemo').onclick=()=>{const lines=['rpm,potential_V_RHE,j_mA_cm2'];for(const rpm of [400,900,1600,2500])for(const e of [0.895,0.9,0.905]){const jl=1000*0.620*4*96485.33212*(1.9e-5)**(2/3)*0.01**(-1/6)*1.2e-6*Math.sqrt(2*Math.PI*rpm/60);lines.push([rpm,e,-1/(1/10+1/jl)].join(','));}$('klText').value=lines.join('\n');$('klD').value='0.000019';$('klNu').value='0.01';$('klC').value='0.0000012';$('klE').value='0.9';$('klRun').click();};
+  $('klDownload').onclick=()=>{if(kl)download('kl_analysis.json',JSON.stringify({schema_version:'1.0.0',kl},null,2));};
+})();
+
+</script>
+<!-- WORKBENCH SCRIPT END -->
 </body>
 </html>

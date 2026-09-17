@@ -1,0 +1,42 @@
+<!-- WORKBENCH START -->
+<section class="card" id="workbench">
+  <div class="card-title">Analysis Workbench · 自动 QC / 多样品比较</div>
+  <p class="hint">Capture the current CV/O₂/N₂ inputs, or import sample JSON files. Each capture is a snapshot; recapture after changing inputs. Analysis uses cathodic currents and a continuous diffusion plateau. Missing results are shown as —.</p>
+  <div class="grid g-4">
+    <div class="field"><label for="wbName">Sample ID</label><input id="wbName" value="Sample-1"></div>
+    <div class="field"><label for="wbRef">Input potential reference</label><select id="wbRef"><option>RHE</option><option>SHE</option><option>AgAgCl_satKCl</option><option>AgAgCl_3M</option><option>SCE</option><option>MSE</option></select></div>
+    <div class="field"><label for="wbPH">pH (25 °C)</label><input id="wbPH" type="number" value="0" step="any"></div>
+    <div class="field"><label for="wbRu">Additional uncompensated Ru (Ω)</label><input id="wbRu" type="number" value="0" min="0" step="any"></div>
+  </div>
+  <p class="hint">RHE conversion and E − I·Ru apply only to captured workbench data. Use Ru = 0 if already corrected. Hupd bounds above are interpreted in V vs RHE here. Original manual calculators remain available.</p>
+  <div class="grid g-4">
+    <div class="field"><label for="wbWidth">Minimum plateau width (V)</label><input id="wbWidth" type="number" value="0.08" min="0.001" step="0.01"></div>
+    <div class="field"><label for="wbSlope">Plateau slope / amplitude (V⁻¹)</label><input id="wbSlope" type="number" value="0.15" min="0.001" step="0.01"></div>
+    <div class="field"><label for="wbTafelLo">Tafel lower bound (V RHE)</label><input id="wbTafelLo" type="number" value="0.85" step="0.01"></div>
+    <div class="field"><label for="wbTafelHi">Tafel upper bound (V RHE)</label><input id="wbTafelHi" type="number" value="0.95" step="0.01"></div>
+  </div>
+  <div class="btn-row"><button class="btn" id="wbCapture">Analyze &amp; add current sample</button><button class="btn btn-secondary" id="wbDemo">Load two-sample demo</button><button class="btn btn-danger" id="wbClear">Clear comparison</button></div>
+  <div class="field"><label for="wbFiles">Import one or more sample JSON files (see README schema)</label><input type="file" id="wbFiles" accept=".json" multiple></div>
+  <p id="wbMessage" role="status" aria-live="polite"></p>
+  <div style="overflow-x:auto"><table class="summary" id="wbTable"></table></div>
+  <p id="wbLegend" class="hint"></p>
+  <div class="grid g-2"><div class="plot" id="wbCvPlot"></div><div class="plot" id="wbOrrPlot"></div></div>
+  <div id="wbQC"></div>
+  <div class="btn-row" id="wbDownloads"></div>
+  <button class="btn btn-secondary" id="wbPlotDownload">Download comparison plots</button>
+</section>
+<section class="card">
+  <div class="card-title">Multi-rpm Koutecký–Levich · 多转速拟合</div>
+  <p class="hint">Paste/import CSV: rpm,potential_V_RHE,j_mA_cm2. Supply a single corrected ORR sweep per rpm, at least three distinct speeds. Values must already be in V vs RHE and mA/cm²; no background or potential correction is applied here.</p>
+  <textarea id="klText" aria-label="Multi-rpm CSV" placeholder="rpm,potential_V_RHE,j_mA_cm2&#10;400,0.895,-1.5&#10;400,0.905,-1.4"></textarea>
+  <div class="field"><label for="klFiles">Import one or more multi-rpm CSV files</label><input type="file" id="klFiles" accept=".csv,.txt" multiple></div>
+  <div class="grid g-4">
+    <div class="field"><label for="klE">Fit potential (V RHE)</label><input id="klE" type="number" value="0.9" step="0.01"></div>
+    <div class="field"><label for="klD">O₂ diffusion D (cm²/s), optional</label><input id="klD" type="number" step="any" placeholder="e.g. 1.9e-5"></div>
+    <div class="field"><label for="klNu">Kinematic viscosity ν (cm²/s)</label><input id="klNu" type="number" step="any" placeholder="e.g. 0.01"></div>
+    <div class="field"><label for="klC">O₂ concentration C (mol/cm³)</label><input id="klC" type="number" step="any" placeholder="e.g. 1.2e-6"></div>
+  </div>
+  <div class="btn-row"><button class="btn" id="klRun">Fit K–L</button><button class="btn btn-secondary" id="klDemo">Load K–L demo</button><button class="btn btn-secondary" id="klDownload">Download K–L JSON</button></div>
+  <pre id="klResult" style="white-space:pre-wrap" aria-live="polite"></pre><div class="plot" id="klPlot"></div>
+</section>
+<!-- WORKBENCH END -->
