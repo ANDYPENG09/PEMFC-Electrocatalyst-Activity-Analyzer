@@ -12,6 +12,8 @@ A self-contained, offline electrochemistry calculator for **PEM fuel cell cataly
 - **Three-standard compatibility** — Based on GB/T 20042.4-2025, methods compatible with US DOE and EU JRC/IEC protocols (q = 0.21 mC/cm²).
 - **Ink-concentration loading** — Catalyst loading auto-calculated from ink concentration (mg/mL), drop volume (µL), RDE area, and Pt weight fraction (30%/50% preset buttons).
 - **Analysis workbench** — Automatic diffusion plateau, explained QC, multi-rpm K–L fitting, multi-sample comparison and versioned JSON/CSV exports in the same offline page and Python core.
+- **Bilingual offline UI** — Switch the standalone HTML between English and Chinese without reloading or internet access.
+- **Final summary CSV** — `summary.csv` combines sample metrics with the exact CV and corrected LSV points used for plotting.
 - **Pure frontend** — Single HTML file, no server, no build step, no internet required. Works offline.
 
 ## Quick Start
@@ -90,7 +92,7 @@ The original manual ECSA, MA/SA, loading, smoothing, plot/PNG/CSV controls and P
 1. Fill the original CV/O₂/N₂ text areas and units/loading settings.
 2. In **Analysis Workbench**, enter a unique sample ID and choose the input potential reference, pH and additional uncompensated Ru. Click **Analyze & add current sample**. RHE inputs receive no pH shift; other references use the 25 °C Nernst term. The correction is `E_RHE − I_A * Ru`. Leave Ru at zero for already corrected curves.
 3. Repeat with another sample, or select multiple input JSON files. Each file may contain one sample object or `{ "samples": [...] }`. Captures are independent snapshots; remove and recapture a sample to update it. **Load two-sample demo** creates labeled synthetic data.
-4. Read ECSA, E1/2, jlim, MA@0.9 V, SA@0.9 V and Tafel in the comparison table. Expand each sample's QC details; inspect the CV/ORR overlays and download plots or the four standardized files.
+4. Read ECSA, E1/2, jlim, MA@0.9 V, SA@0.9 V and Tafel in the comparison table. Expand each sample's QC details; inspect the CV/ORR overlays and download plots or the standardized files, including the combined `summary.csv`.
 5. In **Multi-rpm Koutecký–Levich**, paste/import one or more CSV files using the columns below and click **Fit K–L**. The separate K–L demo recovers n = 4 and signed jk = −10 mA/cm². A current fit is also included in the workbench's `analysis.json` export; changing K–L inputs invalidates it until refitted.
 
 ### QC and numerical conventions
@@ -168,8 +170,9 @@ Python JSON input potentials must already be **V vs RHE**, currents **mA/cm²**,
 | `results.csv` | `sample_id,ecsa_m2_g,ehalf_V,jlim_mA_cm2,ma_0_9V_A_mg,sa_0_9V_mA_cm2_Pt,tafel_mV_dec,qc_status` |
 | `processed_cv.csv` | `sample_id,point_index,potential_V_RHE,j_mA_cm2` (all supplied CV points, acquisition order) |
 | `processed_orr.csv` | `sample_id,point_index,potential_V_RHE,j_raw_mA_cm2,j_background_mA_cm2,j_corrected_mA_cm2,in_plateau` (ascending E) |
+| `summary.csv` | Final all-in-one CSV with `record_type=metrics/cv_point/lsv_point`; CV/LSV rows contain the exact points used by the comparison plots. Existing stable files remain unchanged. |
 
-UTF-8, decimal point, no localized column names. Unavailable numbers are JSON `null` / empty CSV cells, never NaN/Infinity/zero placeholders. CSV booleans are `True`/`False`. IDs join all four files. `qc.checks` contains stable check codes, status, reason and values. An absent N₂ background is null, not a measured zero. A consumer such as `bayesian-optimization-electrocatalyst` should join by `sample_id`, validate `schema_version`, inspect `qc_status`, and filter missing objectives. This change does not modify or claim a tested integration with that other repository. Breaking field/unit changes require a schema major version bump.
+UTF-8, decimal point, no localized column names. Unavailable numbers are JSON `null` / empty CSV cells, never NaN/Infinity/zero placeholders. CSV booleans are `True`/`False`. IDs join all export files. `qc.checks` contains stable check codes, status, reason and values. An absent N₂ background is null, not a measured zero. A consumer such as `bayesian-optimization-electrocatalyst` should join by `sample_id`, validate `schema_version`, inspect `qc_status`, and filter missing objectives. This change does not modify or claim a tested integration with that other repository. Breaking field/unit changes require a schema major version bump.
 
 ### Development
 
