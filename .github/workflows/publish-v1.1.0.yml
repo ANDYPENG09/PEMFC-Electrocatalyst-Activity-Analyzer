@@ -1,0 +1,55 @@
+name: Publish v1.1.0 release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/publish-v1.1.0.yml
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view v1.1.0 >/dev/null 2>&1; then
+            echo "v1.1.0 already exists; nothing to do."
+            exit 0
+          fi
+          cat > release-notes.md <<'EOF'
+          ## PEMFC Electrocatalyst Activity Analyzer v1.1.0
+
+          This release upgrades the offline analyzer from a single-sample calculator into a more complete electrochemical analysis workbench while preserving the original workflow.
+
+          ### Highlights
+          - Added automatic QC with explicit **Good / Check recommended / Invalid** diagnostics.
+          - Added automatic continuous diffusion-plateau detection; no automatic `min(j)` fallback.
+          - Added complete multi-rpm **Koutecký–Levich** fitting with optional electron-number calculation.
+          - Added multi-sample comparison for ECSA, E1/2, jlim, MA, SA and Tafel slope.
+          - Added standardized `analysis.json`, `results.csv`, `processed_cv.csv` and `processed_orr.csv` exports.
+          - Added new **`summary.csv`** containing final metrics plus the exact CV and corrected LSV points used for plotting.
+          - Added a persistent **English / 中文** switch to the standalone offline `index.html`.
+          - Preserved the original ECSA, MA/SA, loading, smoothing, PNG/CSV, PAAX and Origin workflows.
+          - Added numerical regression tests and JavaScript/Python parity checks.
+
+          ### Offline HTML
+          Open `index.html` directly in Chrome, Edge, Safari or Firefox. No server or internet connection is required.
+
+          ### Export compatibility
+          Existing export files and field order remain available. The new `summary.csv` is additive and uses:
+          - `record_type=metrics`
+          - `record_type=cv_point`
+          - `record_type=lsv_point`
+
+          ### Notes
+          QC thresholds are screening heuristics rather than standards certification. See the README for numerical conventions and export schema details.
+          EOF
+          gh release create v1.1.0             --target "$GITHUB_SHA"             --title "PEMFC Electrocatalyst Activity Analyzer v1.1.0"             --notes-file release-notes.md
