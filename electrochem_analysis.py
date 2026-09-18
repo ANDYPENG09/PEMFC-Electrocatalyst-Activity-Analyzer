@@ -15,6 +15,10 @@ RESULT_FIELDS = ["sample_id", "ecsa_m2_g", "ehalf_V", "jlim_mA_cm2",
 CV_FIELDS = ["sample_id", "point_index", "potential_V_RHE", "j_mA_cm2"]
 ORR_FIELDS = ["sample_id", "point_index", "potential_V_RHE", "j_raw_mA_cm2",
               "j_background_mA_cm2", "j_corrected_mA_cm2", "in_plateau"]
+SUMMARY_FIELDS = ["record_type", "sample_id", "point_index", "potential_V_RHE", "j_mA_cm2",
+                  "j_raw_mA_cm2", "j_background_mA_cm2", "j_corrected_mA_cm2", "in_plateau",
+                  "ecsa_m2_g", "ehalf_V", "jlim_mA_cm2", "ma_0_9V_A_mg",
+                  "sa_0_9V_mA_cm2_Pt", "tafel_mV_dec", "qc_status"]
 DEFAULTS = dict(min_width_V=0.08, min_points=7, slope_fraction_per_V=0.15,
                 max_gap_V=0.025, transport_ratio=0.8, stability_fraction=0.05,
                 sensitivity_fraction=0.1)
@@ -316,6 +320,22 @@ def analyze_batch(samples):
     return dict(schema_version=SCHEMA_VERSION,units=dict(potential="V vs RHE",current_density="mA/cm2",loading="mgPt/cm2"),samples=results)
 
 
+def summary_rows(analysis):
+    """Rows for the final human-readable CSV: metrics plus exact CV/LSV plotted points."""
+    rows=[]
+    for s in analysis["samples"]:
+        rows.append(dict(record_type="metrics",sample_id=s["sample_id"],**s["metrics"],qc_status=s["qc"]["status"]))
+        for r in s["processed_cv"]:
+            rows.append(dict(record_type="cv_point",sample_id=s["sample_id"],point_index=r["point_index"],
+                             potential_V_RHE=r["potential_V_RHE"],j_mA_cm2=r["j_mA_cm2"]))
+        for r in s["processed_orr"]:
+            rows.append(dict(record_type="lsv_point",sample_id=s["sample_id"],point_index=r["point_index"],
+                             potential_V_RHE=r["potential_V_RHE"],j_mA_cm2=r["j_corrected_mA_cm2"],
+                             j_raw_mA_cm2=r["j_raw_mA_cm2"],j_background_mA_cm2=r["j_background_mA_cm2"],
+                             j_corrected_mA_cm2=r["j_corrected_mA_cm2"],in_plateau=r["in_plateau"]))
+    return rows
+
+
 def export_analysis(analysis, directory):
     """Stable, UTF-8 files. Null JSON values and empty CSV cells mean unavailable."""
     directory=Path(directory)
@@ -323,7 +343,8 @@ def export_analysis(analysis, directory):
     (directory/"analysis.json").write_text(json.dumps(analysis,ensure_ascii=False,indent=2,allow_nan=False),encoding="utf-8")
     tables={"results.csv":(RESULT_FIELDS,[dict(sample_id=s["sample_id"],**s["metrics"],qc_status=s["qc"]["status"]) for s in analysis["samples"]]),
             "processed_cv.csv":(CV_FIELDS,[r for s in analysis["samples"] for r in s["processed_cv"]]),
-            "processed_orr.csv":(ORR_FIELDS,[r for s in analysis["samples"] for r in s["processed_orr"]])}
+            "processed_orr.csv":(ORR_FIELDS,[r for s in analysis["samples"] for r in s["processed_orr"]]),
+            "summary.csv":(SUMMARY_FIELDS,summary_rows(analysis))}
     for name,(fields,rows) in tables.items():
         with (directory/name).open("w",newline="",encoding="utf-8") as f:
             writer=csv.DictWriter(f,fieldnames=fields)
