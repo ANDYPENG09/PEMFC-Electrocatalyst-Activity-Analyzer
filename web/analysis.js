@@ -5,6 +5,7 @@ const ECAnalysis = (() => {
   const resultFields=['sample_id','ecsa_m2_g','ehalf_V','jlim_mA_cm2','ma_0_9V_A_mg','sa_0_9V_mA_cm2_Pt','tafel_mV_dec','qc_status'];
   const cvFields=['sample_id','point_index','potential_V_RHE','j_mA_cm2'];
   const orrFields=['sample_id','point_index','potential_V_RHE','j_raw_mA_cm2','j_background_mA_cm2','j_corrected_mA_cm2','in_plateau'];
+  const summaryFields=['record_type','sample_id','point_index','potential_V_RHE','j_mA_cm2','j_raw_mA_cm2','j_background_mA_cm2','j_corrected_mA_cm2','in_plateau','ecsa_m2_g','ehalf_V','jlim_mA_cm2','ma_0_9V_A_mg','sa_0_9V_mA_cm2_Pt','tafel_mV_dec','qc_status'];
   const mean=a=>a.reduce((s,v)=>s+v,0)/a.length;
   function quantile(a,q){const b=[...a].sort((a,b)=>a-b),p=(b.length-1)*q,k=Math.floor(p);return b[k]+(b[Math.min(k+1,b.length-1)]-b[k])*(p-k);}
   const median=a=>quantile(a,0.5);
@@ -123,7 +124,16 @@ const ECAnalysis = (() => {
   }
   function analyzeBatch(samples){const ids=samples.map(s=>String(s.sample_id));if(!ids.length||ids.some(s=>!s.trim())||new Set(ids).size!==ids.length)throw Error('Provide nonempty, unique sample IDs');return {schema_version:'1.0.0',units:{potential:'V vs RHE',current_density:'mA/cm2',loading:'mgPt/cm2'},samples:samples.map(analyzeSample)};}
   function csv(fields,rows){const cell=v=>v===null||v===undefined?'':typeof v==='boolean'?(v?'True':'False'):'"'+String(v).replaceAll('"','""')+'"';return [fields.join(','),...rows.map(r=>fields.map(k=>cell(r[k])).join(','))].join('\r\n')+'\r\n';}
-  function exports(analysis){return {'analysis.json':JSON.stringify(analysis,null,2),'results.csv':csv(resultFields,analysis.samples.map(s=>({sample_id:s.sample_id,...s.metrics,qc_status:s.qc.status}))),'processed_cv.csv':csv(cvFields,analysis.samples.flatMap(s=>s.processed_cv)),'processed_orr.csv':csv(orrFields,analysis.samples.flatMap(s=>s.processed_orr))};}
-  return {defaults,plateau,halfWave,kinetic,curve,interp,sweeps,cvAnalysis,klFit,analyzeSample,analyzeBatch,exports,resultFields};
+  function summaryRows(analysis){
+    const rows=[];
+    for(const s of analysis.samples){
+      rows.push({record_type:'metrics',sample_id:s.sample_id,...s.metrics,qc_status:s.qc.status});
+      s.processed_cv.forEach(r=>rows.push({record_type:'cv_point',sample_id:s.sample_id,point_index:r.point_index,potential_V_RHE:r.potential_V_RHE,j_mA_cm2:r.j_mA_cm2}));
+      s.processed_orr.forEach(r=>rows.push({record_type:'lsv_point',sample_id:s.sample_id,point_index:r.point_index,potential_V_RHE:r.potential_V_RHE,j_mA_cm2:r.j_corrected_mA_cm2,j_raw_mA_cm2:r.j_raw_mA_cm2,j_background_mA_cm2:r.j_background_mA_cm2,j_corrected_mA_cm2:r.j_corrected_mA_cm2,in_plateau:r.in_plateau}));
+    }
+    return rows;
+  }
+  function exports(analysis){return {'analysis.json':JSON.stringify(analysis,null,2),'results.csv':csv(resultFields,analysis.samples.map(s=>({sample_id:s.sample_id,...s.metrics,qc_status:s.qc.status}))),'processed_cv.csv':csv(cvFields,analysis.samples.flatMap(s=>s.processed_cv)),'processed_orr.csv':csv(orrFields,analysis.samples.flatMap(s=>s.processed_orr)),'summary.csv':csv(summaryFields,summaryRows(analysis))};}
+  return {defaults,plateau,halfWave,kinetic,curve,interp,sweeps,cvAnalysis,klFit,analyzeSample,analyzeBatch,exports,resultFields,summaryFields,summaryRows};
 })();
 if(typeof module!=='undefined')module.exports=ECAnalysis;
