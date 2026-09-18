@@ -7,7 +7,7 @@ import unittest
 import numpy as np
 import electrochem_calc as legacy
 from electrochem_analysis import (analyze_batch, analyze_sample, detect_plateau,
-    export_analysis, half_wave, kl_fit, RESULT_FIELDS, CV_FIELDS, ORR_FIELDS)
+    export_analysis, half_wave, kl_fit, RESULT_FIELDS, CV_FIELDS, ORR_FIELDS, SUMMARY_FIELDS)
 from electrochem_analysis import load_kl_csv
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -113,9 +113,13 @@ class AnalysisTests(unittest.TestCase):
             restored=json.loads((Path(d)/"analysis.json").read_text(encoding="utf-8"))
             self.assertEqual(restored["schema_version"],"1.0.0")
             self.assertIsNone(restored["samples"][0]["metrics"]["ecsa_m2_g"])
-            for name,fields in [("results.csv",RESULT_FIELDS),("processed_cv.csv",CV_FIELDS),("processed_orr.csv",ORR_FIELDS)]:
+            for name,fields in [("results.csv",RESULT_FIELDS),("processed_cv.csv",CV_FIELDS),("processed_orr.csv",ORR_FIELDS),("summary.csv",SUMMARY_FIELDS)]:
                 with (Path(d)/name).open(encoding="utf-8",newline="") as f:
-                    rows=csv.DictReader(f);self.assertEqual(rows.fieldnames,fields);self.assertGreater(len(list(rows)),0)
+                    rows=csv.DictReader(f);self.assertEqual(rows.fieldnames,fields);data=list(rows);self.assertGreater(len(data),0)
+                    if name=="summary.csv":
+                        self.assertIn("metrics",{r["record_type"] for r in data})
+                        self.assertIn("cv_point",{r["record_type"] for r in data})
+                        self.assertIn("lsv_point",{r["record_type"] for r in data})
 
     def test_sensitivity_detects_alternative_plateau(self):
         s=sample()

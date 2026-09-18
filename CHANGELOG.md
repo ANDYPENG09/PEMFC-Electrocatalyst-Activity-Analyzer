@@ -2,6 +2,9 @@
 
 ## 2026-09-18 — Offline analysis workbench / export schema 1.0.0
 
+- Added `summary.csv`: one final CSV containing sample metrics plus exact CV and corrected LSV plot points (`metrics`, `cv_point`, `lsv_point`) while preserving all existing exports.
+- Added an offline English/Chinese UI switch to the standalone `index.html`; language selection persists locally.
+
 - Added explained Good / Check recommended / Invalid QC, including N₂ coverage, CV repeatability, transport proximity and plateau-selection sensitivity.
 - Added contiguous low-derivative diffusion plateau detection, median/MAD/SD and plateau-based E1/2. Removed automatic min(j) fallback; kept explicit manual limiting-current entry and legacy-potential mode.
 - Added multi-rpm CSV and JSON Koutecký–Levich analysis, fit plot, signed slope/intercept/jk, R² and optional electron number with explicit transport constants and rad/s conversion.
