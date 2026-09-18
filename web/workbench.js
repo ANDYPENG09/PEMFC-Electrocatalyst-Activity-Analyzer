@@ -54,7 +54,7 @@
       const series=analysis.samples.map((s,i)=>({x:s[key].map(r=>r.potential_V_RHE),y:s[key].map(r=>r[jkey]),color:colors[i%colors.length]})).filter(s=>s.x.length);
       if(series.length)svgChart($(id),series,{title,xlabel:'E (V vs RHE)',ylabel:'j (mA/cm²)'});
     }
-    for(const name of ['analysis.json','results.csv','processed_cv.csv','processed_orr.csv']){
+    for(const name of ['analysis.json','results.csv','processed_cv.csv','processed_orr.csv','summary.csv']){
       const b=text('button',`Download ${name}`,$('wbDownloads'));b.className='btn btn-secondary';b.onclick=()=>download(name,ECAnalysis.exports({...analysis,...(kl?{kl}:{})})[name]);
     }
   }
