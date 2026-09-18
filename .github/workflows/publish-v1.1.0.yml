@@ -21,7 +21,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           if gh release view v1.1.0 >/dev/null 2>&1; then
-            echo "v1.1.0 already exists; nothing to do."
+            echo "v1.1.0 already exists; uploading latest standalone HTML."
+            gh release upload v1.1.0 index.html#PEMFC-Electrocatalyst-Activity-Analyzer-v1.1.0.html --clobber
             exit 0
           fi
           cat > release-notes.md <<'EOF'
