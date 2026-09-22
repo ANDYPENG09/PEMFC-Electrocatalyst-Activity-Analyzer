@@ -23,8 +23,28 @@
     ['Import one or more multi-rpm CSV files','导入一个或多个多转速 CSV 文件'],['Fit potential (V RHE)','拟合电位 (V RHE)'],['O₂ diffusion D (cm²/s), optional','O₂ 扩散系数 D (cm²/s，可选)'],
     ['Kinematic viscosity ν (cm²/s)','运动黏度 ν (cm²/s)'],['O₂ concentration C (mol/cm³)','O₂ 浓度 C (mol/cm³)'],['Fit K–L','拟合 K–L'],['Load K–L demo','载入 K–L 示例'],['Download K–L JSON','下载 K–L JSON'],
     ['Sample','样品'],['Remove','移除'],['CV comparison','CV 比较'],['ORR comparison','ORR 比较'],['Koutecky–Levich fit','Koutecký–Levich 拟合'],
+    ['LSV Data (O','LSV 数据 (O'],['Background)','背景)'],['Manual j','手动 j'],['Limiting Current j','极限电流 j'],['Manual jlim Evaluation Potential (V)','手动极限电流评价电位 (V)'],
     ['Good','良好'],['Check recommended','建议检查'],['Invalid','无效']
   ]);
+  exact.set("Figure contents · 导出图内容","导出图内容");
+  exact.set("Hupd integration panel · 积分区间图","积分区间图");
+  exact.set("Results table · 数据汇总","数据汇总");
+  exact.set("Shading and markers · 阴影与标记","阴影与标记");
+  exact.set("Layout · 排版","排版");
+  exact.set("Compact · 紧凑排列","紧凑排列");
+  exact.set("16:9 · 演示文稿","演示文稿");
+  exact.set("Select only the panels you need. Shading and markers affect PNG exports, not calculations. · 仅导出勾选内容；阴影与标记选项仅影响图片，不改变计算。","仅导出勾选内容；阴影与标记选项仅影响图片，不改变计算。");
+  exact.set("Export selected figure · 导出所选图","导出所选图");
+  exact.set("Analysis Workbench · 自动 QC / 多样品比较","自动 QC / 多样品比较");
+  exact.set("Sample name · 样品名称","样品名称");
+  exact.set("History is saved in this browser. Back up JSON before moving the HTML or clearing browser data. · 历史保存在当前浏览器；移动 HTML 或清理浏览器前请备份 JSON。","历史保存在当前浏览器；移动 HTML 或清理浏览器前请备份 JSON。");
+  exact.set("Back up history · 备份历史","备份历史");
+  exact.set("Select all · 全选","全选");
+  exact.set("Select none · 全不选","全不选");
+  exact.set("CV comparison · CV 比较","CV 比较");
+  exact.set("LSV comparison · LSV 比较","LSV 比较");
+  exact.set("Checked samples appear in plots and analysis exports; history backup includes all samples. · 勾选样品用于绘图和分析导出；历史备份包含全部样品。","勾选样品用于绘图和分析导出；历史备份包含全部样品。");
+  exact.set("Multi-rpm Koutecký–Levich · 多转速拟合","多转速拟合");
   const phrases = [
     ['Hupd background subtraction · ECSA · ORR mass/specific activity · Offline calculation','Hupd 背景扣除 · ECSA · ORR 质量/比活性 · 离线计算'],
     ['Based on GB/T 20042.4-2025. Methods are compatible with US DOE and EU JRC/IEC protocols (Hupd ECSA, K-L kinetic current, q = 0.21 mC/cm²).','基于 GB/T 20042.4-2025；方法兼容美国 DOE 与欧盟 JRC/IEC 常用流程（Hupd ECSA、K-L 动力学电流，q = 0.21 mC/cm²）。'],
@@ -41,7 +61,8 @@
     ['Inputs changed. Run Fit K–L to refresh results.','输入已变化，请重新执行 K–L 拟合。']
   ];
   const originals=new WeakMap();
-  let lang=(localStorage.getItem('pemfc-ui-lang')||((navigator.language||'').toLowerCase().startsWith('zh')?'zh':'en'));
+  let savedLang=null;try{savedLang=localStorage.getItem('pemfc-ui-lang');}catch(e){}
+  let lang=savedLang||((navigator.language||'').toLowerCase().startsWith('zh')?'zh':'en');
   let applying=false;
   function zhText(s){
     if(exact.has(s)) return exact.get(s);
@@ -63,14 +84,14 @@
     const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
     let n; while((n=walker.nextNode())){
       const tag=n.parentElement?.tagName;
-      if(tag==='SCRIPT'||tag==='STYLE'||tag==='TEXTAREA')continue;
+      if(tag==='SCRIPT'||tag==='STYLE'||tag==='TEXTAREA'||n.parentElement?.closest('[data-i18n-skip]'))continue;
       if(n.nodeValue.trim()) translateNode(n);
     }
     document.documentElement.lang=lang==='zh'?'zh-CN':'en';
     const b=document.getElementById('langToggle'); if(b)b.textContent=lang==='zh'?'EN':'中文';
     applying=false;
   }
-  function toggle(){lang=lang==='zh'?'en':'zh';localStorage.setItem('pemfc-ui-lang',lang);apply();}
+  function toggle(){lang=lang==='zh'?'en':'zh';try{localStorage.setItem('pemfc-ui-lang',lang);}catch(e){}apply();}
   window.uiLang=()=>lang;
   window.uiT=(en,zh)=>lang==='zh'?zh:en;
   const header=document.querySelector('header');

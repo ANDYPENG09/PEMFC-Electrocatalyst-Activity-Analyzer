@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.2.0 — 2026-09-22
+
+- Open O₂/N₂ LSV inputs by default.
+- Add persistent named sample history, renaming, restore-input actions, selection, raw JSON backup/import, duplicate-name handling and CV-only comparison.
+- Include sample legends in comparison PNGs; choose CV/LSV comparisons independently.
+- Select CV, LSV, Hupd, results and annotations independently in exported figures; retain 16:9 alongside compact layout.
+- Reject stale plots after clearing/editing inputs, avoid N₂ endpoint extrapolation, reject internal N₂ gaps, and stop extrapolating evaluation current.
+- Clip negative contributions in the manual positive-only Hupd integration; escape SVG labels and tolerate unavailable local storage.
+- Add DOM interaction regressions alongside the existing 14 numerical/Python–JavaScript parity tests.
+
 ## 2026-09-18 — Offline analysis workbench / export schema 1.0.0
 
 - Added `summary.csv`: one final CSV containing sample metrics plus exact CV and corrected LSV plot points (`metrics`, `cv_point`, `lsv_point`) while preserving all existing exports.
