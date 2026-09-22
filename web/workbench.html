@@ -3,7 +3,7 @@
   <div class="card-title">Analysis Workbench · 自动 QC / 多样品比较</div>
   <p class="hint">Capture the current CV/O₂/N₂ inputs, or import sample JSON files. Each capture is a snapshot; recapture after changing inputs. Analysis uses cathodic currents and a continuous diffusion plateau. Missing results are shown as —.</p>
   <div class="grid g-4">
-    <div class="field"><label for="wbName">Sample ID</label><input id="wbName" value="Sample-1"></div>
+    <div class="field"><label for="wbName">Sample name · 样品名称</label><input id="wbName" value="Sample-1" maxlength="80"></div>
     <div class="field"><label for="wbRef">Input potential reference</label><select id="wbRef"><option>RHE</option><option>SHE</option><option>AgAgCl_satKCl</option><option>AgAgCl_3M</option><option>SCE</option><option>MSE</option></select></div>
     <div class="field"><label for="wbPH">pH (25 °C)</label><input id="wbPH" type="number" value="0" step="any"></div>
     <div class="field"><label for="wbRu">Additional uncompensated Ru (Ω)</label><input id="wbRu" type="number" value="0" min="0" step="any"></div>
@@ -16,6 +16,9 @@
     <div class="field"><label for="wbTafelHi">Tafel upper bound (V RHE)</label><input id="wbTafelHi" type="number" value="0.95" step="0.01"></div>
   </div>
   <div class="btn-row"><button class="btn" id="wbCapture">Analyze &amp; add current sample</button><button class="btn btn-secondary" id="wbDemo">Load two-sample demo</button><button class="btn btn-danger" id="wbClear">Clear comparison</button></div>
+  <p class="hint">History is saved in this browser. Back up JSON before moving the HTML or clearing browser data. · 历史保存在当前浏览器；移动 HTML 或清理浏览器前请备份 JSON。</p>
+  <div class="btn-row"><button class="btn btn-secondary" id="wbBackup">Back up history · 备份历史</button><button class="btn btn-secondary" id="wbSelectAll">Select all · 全选</button><button class="btn btn-secondary" id="wbSelectNone">Select none · 全不选</button></div>
+  <p class="hint" id="wbStorage" role="status"></p>
   <div class="field"><label for="wbFiles">Import one or more sample JSON files (see README schema)</label><input type="file" id="wbFiles" accept=".json" multiple></div>
   <p id="wbMessage" role="status" aria-live="polite"></p>
   <div style="overflow-x:auto"><table class="summary" id="wbTable"></table></div>
@@ -23,6 +26,11 @@
   <div class="grid g-2"><div class="plot" id="wbCvPlot"></div><div class="plot" id="wbOrrPlot"></div></div>
   <div id="wbQC"></div>
   <div class="btn-row" id="wbDownloads"></div>
+  <div style="display:flex;gap:20px;margin:12px 0">
+    <label><input type="checkbox" id="wbExportCv" checked style="width:auto"> CV comparison · CV 比较</label>
+    <label><input type="checkbox" id="wbExportLsv" checked style="width:auto"> LSV comparison · LSV 比较</label>
+  </div>
+  <p class="hint">Checked samples appear in plots and analysis exports; history backup includes all samples. · 勾选样品用于绘图和分析导出；历史备份包含全部样品。</p>
   <button class="btn btn-secondary" id="wbPlotDownload">Download comparison plots</button>
 </section>
 <section class="card">

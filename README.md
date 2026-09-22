@@ -199,3 +199,27 @@ MIT License — see [LICENSE](LICENSE) for details.
 - Integration method validated against GB/T 20042.4-2025 (China National Standard for PEM Fuel Cell Electrocatalyst Testing).
 - Baseline convention matches Origin's H-upd integration gadget (end-point horizontal baseline).
 - Savitzky-Golay smoothing for LSV noise reduction (window=7, 2nd-order polynomial).
+
+### v1.2.0 — sample history and selectable figures
+
+- The O₂/N₂ LSV input area opens by default.
+- Enter a **Sample name**, then **Analyze & add current sample**. Add further samples the same way; check the samples to overlay in the CV and LSV plots. Each exported comparison plot includes the sample names and matching colors. CV-only samples are supported.
+- Rename samples in the table; **Restore inputs** restores a browser-captured sample's original data and settings. Saving a changed sample uses a new name. Imported analysis-only records can be compared but do not contain the original form.
+- History persists in the current browser's local storage. Use **Back up history** to save all raw samples/settings to `sample_history.json`; import it using the JSON input. Duplicate imported names receive a numeric suffix. Moving the HTML, changing browsers, or clearing browser data may change/remove local history. Storage failures are shown without discarding samples from the current session.
+- Checked samples control plots and analysis/CSV exports. History backups always include all samples.
+- **Figure contents** selects ECSA–CV, LSV, the Hupd integration panel, and the results table independently. The default is CV + LSV only. **Shading and markers** toggles annotations in PNG files without changing calculations. Choose compact stacking or a 16:9 canvas; plots retain their aspect ratio. Comparison downloads have independent CV/LSV checkboxes.
+- Browser captures and the single-sample LSV tool omit O₂ endpoints outside N₂ coverage and report the count. No endpoint extrapolation is used; internal N₂ gaps over 25 mV and non-overlapping curves are rejected. Direct Python/raw-JSON analysis keeps the original full-coverage QC rule. The manual LSV tool retains its existing 7-point smoothing; workbench data remain unsmoothed.
+- Corrected stale-plot exports after clearing/editing inputs, out-of-range evaluation-potential extrapolation, and negative contributions in the manual positive-only Hupd integration.
+
+中文操作：输入第一份 CV/O₂/N₂ 数据 → 填写样品名称 →「分析并加入当前样品」→ 换第二份数据继续添加 → 勾选要比较的样品。导出时只勾选 CV 和 LSV，即不会加入数据汇总、积分区间图；取消「阴影与标记」还可去掉曲线中的区域阴影和评价点。
+
+Developer checks (Node with jsdom is **only** needed for tests; the HTML remains dependency-free):
+
+```bash
+python -m unittest discover -s tests -q
+python build_html.py --check
+npm install
+npm test
+```
+
+`tests/test_ui.cjs` uses a DOM emulator and mocked PNG image/canvas I/O to check history, naming, selection, restoration, imports, storage failure, figure panel selection, legends, invalidation, coverage and language switching. It is not a full-browser rasterization test.
