@@ -223,3 +223,7 @@ npm test
 ```
 
 `tests/test_ui.cjs` uses a DOM emulator and mocked PNG image/canvas I/O to check history, naming, selection, restoration, imports, storage failure, figure panel selection, legends, invalidation, coverage and language switching. It is not a full-browser rasterization test.
+
+### v1.2.1 — calculation consistency and robustness
+
+Single-sample ECSA now uses the same boundary-interpolated positive-only integration as the workbench. The automatic horizontal baseline is evaluated at the selected upper integration limit (0.40 V by default), so custom-limit results may differ from older versions. SA uses full-precision ECSA and clears with invalid/cleared CV data. An unusable supplied N₂ background suppresses ORR metrics rather than silently reporting uncorrected values. Large-array interpolation uses binary search; regressions cover one million interpolation points and 150,000 plateau points.

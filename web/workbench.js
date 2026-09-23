@@ -63,7 +63,7 @@
     }
     if($('cvText').value.trim()){
       s.cv={...read('cvText','cvPotUnit','cvCurUnit'),scan_rate_V_s:scanRateV(),q_mC_cm2:qspecCmC(),hupd_range_V:[num('hlo'),num('hhi')]};
-      if($('baselineMode').value==='manual'&&$('baseline').value.trim())s.cv.baseline_mA_cm2=num('baseline');
+      if($('baselineMode').value==='manual'){if(!Number.isFinite(num('baseline')))throw Error('Enter a finite manual baseline / 请填写有效手动基线');s.cv.baseline_mA_cm2=num('baseline');}
     }s.input_state=Object.fromEntries(inputIds.map(id=>[id,$(id).value]));s.saved_at=new Date().toISOString();return s;
   }
   function render(){
@@ -91,7 +91,7 @@
       const list=text('ul','',detail);s.qc.checks.forEach(c=>text('li',`${c.status}: ${c.reason}${checkDetail(c)}`,list));
     });
     for(const [id,key,jkey,title] of [['wbCvPlot','processed_cv','j_mA_cm2','CV comparison'],['wbOrrPlot','processed_orr','j_corrected_mA_cm2','ORR comparison']]){
-      const series=analysis.samples.map((s,i)=>({name:s.sample_id,x:s[key].map(r=>r.potential_V_RHE),y:s[key].map(r=>r[jkey]),color:colors[i%colors.length]})).filter(s=>selected.has(s.name)&&s.x.length);
+      const series=analysis.samples.map((s,i)=>({name:s.sample_id,x:s[key].filter(r=>Number.isFinite(r[jkey])).map(r=>r.potential_V_RHE),y:s[key].filter(r=>Number.isFinite(r[jkey])).map(r=>r[jkey]),color:colors[i%colors.length]})).filter(s=>selected.has(s.name)&&s.x.length);
       if(series.length)svgChart($(id),series,{title,xlabel:'E (V vs RHE)',ylabel:'j (mA/cm²)'});
     }
     for(const name of ['analysis.json','results.csv','processed_cv.csv','processed_orr.csv','summary.csv']){
@@ -119,6 +119,7 @@
       for(const f of $('wbFiles').files){
         const p=JSON.parse(await f.text()),items=p.samples||[p];if(!Array.isArray(items))throw Error('Invalid samples JSON');
         for(const item of items){
+          if(item?.qc?.checks?.some(c=>c.code==='n2_background'&&c.status==='Invalid'))throw Error('Invalid N2 analysis cannot be reconstructed; import the raw history backup / N₂ 无效分析无法重建，请导入原始历史备份');
           let raw=item;
           // Reimport analysis.json as well as raw history; retain original raw O2/N2 when present.
           if(!item.orr&&Array.isArray(item.processed_orr)){

@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.2.1 — 2026-09-23
+
+- Share the boundary-interpolated, positive-only CV integration between the single-sample tool and workbench. Automatic baseline uses the selected upper integration limit (default 0.40 V); custom limits can therefore change previously reported ECSA.
+- Compute SA from full-precision ECSA and clear it when CV inputs are cleared or invalid. Validate loading, scan rate, charge density, baseline and malformed two-column data.
+- Suppress ORR metrics and corrected-current points when supplied N₂ background cannot be applied; keep independent valid CV results and comparison samples.
+- Use binary-search interpolation and avoid spread-argument limits in large plateau analyses.
+- Clip curves to the plot area, honor explicit axis bounds, reject inverted ranges and center labels above comparison legends.
+- Verify with 15 numerical/parity tests, DOM interaction regressions, a million-point logarithmic lookup check and a 150,000-point plateau regression. PNG I/O in DOM tests remains mocked.
+
 ## v1.2.0 — 2026-09-22
 
 - Open O₂/N₂ LSV inputs by default.
