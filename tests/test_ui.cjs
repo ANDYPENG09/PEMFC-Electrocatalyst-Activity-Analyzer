@@ -76,6 +76,20 @@ const tick=()=>new Promise(r=>setTimeout(r,20));
  const before=el('wbTable').rows.length;
  w.Storage.prototype.setItem=function(){throw Error('quota');};click('wbDemo');await tick();
  assert.equal(el('wbTable').rows.length,before+2);assert(el('wbStorage').textContent.includes('unavailable or full'));
+ // Single-sample ECSA shares the workbench core, including non-default bounds.
+ click('loadExample');el('hhi').value='0.35';el('hlo').value='0.073';click('cvBtn');click('lsvBtn');
+ const exact=w.eval(`(()=>{const rows=parse2col($('cvText').value,$('cvPotUnit').value,$('cvCurUnit').value);return ECAnalysis.cvAnalysis({E:rows.map(r=>r[0]),j:rows.map(r=>r[1]*1000/num('area')),hupd_range_V:[num('hlo'),num('hhi')],scan_rate_V_s:scanRateV(),q_mC_cm2:qspecCmC()},computePtLoad()/1000)})()`);
+ assert.equal(el('o_ecsa').textContent,exact.ecsa_m2_g.toFixed(2));
+ const expectedSA=w.eval(`(()=>{const j=Math.abs(num('jE')),jl=Math.abs(num('jlim'));return j*jl/(jl-j)/(ecsaResult.ecsa_m2_g*computePtLoad()/100)})()`);
+ assert.equal(el('o_sa').textContent,expectedSA.toFixed(3));
+ click('cvClear');assert.equal(el('o_sa').textContent,'—');assert.notEqual(el('o_ma').textContent,'—');
+ click('loadExample');el('qspec').value='0';click('cvBtn');assert.equal(el('o_ecsa').textContent,'—');assert.equal(el('o_sa').textContent,'—');
+ el('qspec').value='0.21';el('qUnit').value='mC/cm²';
+ el('cvText').value='potential,current\n0.1,0.001\n0.2,broken\n0.3,0.001';click('cvBtn');assert(el('cvMsg').textContent.includes('line 3'));assert.equal(el('cvPlotFull').querySelector('svg'),null);
+ el('cvText').value='0.1,0.001\n0.2,,0.002';click('cvBtn');assert(el('cvMsg').textContent.includes('line 2'));
+ // A reversed axis cannot silently produce inverted data.
+ click('loadExample');el('hhi').value='0.4';el('hlo').value='0.05';click('cvBtn');
+ el('cvXmin').value='0.5';el('cvXmax').value='0.1';click('cvApplyX');assert(alerts.at(-1).includes('Axis minimum'));
  assert.deepEqual(errors,[]);
  console.log('UI regressions passed: default-open, naming, selection, persistence, safe legends, restore, CV-only, PNG panel/options/layout, stale clearing, N2 coverage, bilingual toggle.');
  dom.window.close();

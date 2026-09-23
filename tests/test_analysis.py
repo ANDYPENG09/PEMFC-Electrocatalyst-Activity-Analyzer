@@ -65,7 +65,12 @@ class AnalysisTests(unittest.TestCase):
         s=sample();del s["n2"]
         self.assertEqual(analyze_sample(s)["qc"]["status"],"Check recommended")
         s=sample();s["n2"]["E"]=s["n2"]["E"][20:];s["n2"]["j"]=s["n2"]["j"][20:]
-        self.assertEqual(analyze_sample(s)["qc"]["status"],"Invalid")
+        r=analyze_sample(s)
+        self.assertEqual(r["qc"]["status"],"Invalid")
+        for key in ["ehalf_V","jlim_mA_cm2","ma_0_9V_A_mg","sa_0_9V_mA_cm2_Pt","tafel_mV_dec"]:
+            self.assertIsNone(r["metrics"][key])
+        self.assertTrue(all(row["j_corrected_mA_cm2"] is None for row in r["processed_orr"]))
+        self.assertGreater(r["metrics"]["ecsa_m2_g"],0)
 
     def test_cv_instability_and_insufficient_cv(self):
         s=sample()
@@ -154,6 +159,11 @@ class AnalysisTests(unittest.TestCase):
         with self.assertRaises(ValueError):analyze_sample({**sample(),"tafel_range_V":[.95,.85]})
         with self.assertRaises(ValueError):kl_fit(kl_data()["traces"],potential_V=float('nan'))
 
+    def test_interpolation_rejects_nonfinite_target(self):
+        from electrochem_analysis import interpolate
+        for target in [float('nan'),float('inf'),-1,2]:
+            self.assertIsNone(interpolate(np.array([0.,1.]),np.array([0.,2.]),target))
+
     def test_legacy_formulas(self):
         self.assertAlmostEqual(float(legacy.current_to_density(-.001,.2)),-5)
         self.assertAlmostEqual(float(legacy.density_to_current(-5,.2)),-.001)
@@ -170,7 +180,8 @@ class AnalysisTests(unittest.TestCase):
         self.assertGreater(legacy.ecsa_from_hupd([.05,.2,.4],[1,2,1],.02,loading_ug_cm2=20)["ECSA_m2_per_g"],0)
 
     def test_javascript_python_parity(self):
-        payload=dict(samples=[sample(),sample("PtCo",.87)],kl=kl_data())
+        invalid=sample("Invalid N2");invalid["n2"]["E"]=invalid["n2"]["E"][20:];invalid["n2"]["j"]=invalid["n2"]["j"][20:]
+        payload=dict(samples=[sample(),sample("PtCo",.87),invalid],kl=kl_data())
         program="const fs=require('fs'),a=require('./web/analysis.js'),p=JSON.parse(fs.readFileSync(0,'utf8'));const r=a.analyzeBatch(p.samples);r.kl=a.klFit(p.kl.traces,p.kl.potential_V,p.kl.D_cm2_s,p.kl.nu_cm2_s,p.kl.C_mol_cm3);console.log(JSON.stringify(r));"
         result=subprocess.run(["node","-e",program],input=json.dumps(payload),text=True,capture_output=True,cwd=ROOT,check=True)
         js=json.loads(result.stdout);py=analyze_batch(payload["samples"]);py["kl"]=kl_fit(**payload["kl"])

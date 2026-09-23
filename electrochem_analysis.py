@@ -47,7 +47,7 @@ def curve(E, j):
 
 
 def interpolate(x, y, target, max_gap=0.025):
-    if target < x[0] or target > x[-1]:
+    if not np.isfinite(target) or not len(x) or target < x[0] or target > x[-1]:
         return None
     k = int(np.searchsorted(x, target))
     if k < len(x) and abs(x[k] - target) < 1e-12:
@@ -248,7 +248,8 @@ def analyze_sample(sample):
     else:
         check("n2_background","Check recommended","N2 background unavailable; ORR remains uncorrected")
     y=raw-bg if bg is not None else raw.copy()
-    plateau=detect_plateau(x,y,**cfg)
+    background_invalid=bool(sample.get("n2")) and bg is None
+    plateau=None if background_invalid else detect_plateau(x,y,**cfg)
     jl=plateau["jlim_mA_cm2"] if plateau else None
     check("plateau","Good" if plateau else "Invalid",
           "Continuous low-derivative cathodic plateau detected" if plateau else "No resolved diffusion plateau; no min(j) fallback",plateau)
@@ -303,7 +304,7 @@ def analyze_sample(sample):
                  ma_0_9V_A_mg=jk/1000/loading if jk and loading else None,
                  sa_0_9V_mA_cm2_Pt=jk/(ecsa*loading*10) if jk and ecsa and loading else None,
                  tafel_mV_dec=tf["slope_mV_dec"] if tf else None)
-    processed_orr=[dict(zip(ORR_FIELDS,[sid,i,float(e),float(raw[i]),float(bg[i]) if bg is not None else None,float(y[i]),bool(plateau and plateau["start_V"]<=e<=plateau["end_V"])])) for i,e in enumerate(x)]
+    processed_orr=[dict(zip(ORR_FIELDS,[sid,i,float(e),float(raw[i]),float(bg[i]) if bg is not None else None,None if background_invalid else float(y[i]),bool(plateau and plateau["start_V"]<=e<=plateau["end_V"])])) for i,e in enumerate(x)]
     processed_cv=[dict(zip(CV_FIELDS,[sid,i,float(e),float(j)])) for i,(e,j) in enumerate(zip(sample.get("cv",{}).get("E",[]),sample.get("cv",{}).get("j",[])))]
     return dict(sample_id=sid,metrics=metrics,qc=dict(status=status,checks=checks),plateau=plateau,
                 cv=cv,tafel=tf,metadata=sample.get("metadata",{}),

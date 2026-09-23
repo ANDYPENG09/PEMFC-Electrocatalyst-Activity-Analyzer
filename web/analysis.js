@@ -17,8 +17,11 @@ const ECAnalysis = (() => {
     return [[...E],[...j]];
   }
   function interp(x,y,t,gap=0.025){
-    if(t<x[0]||t>x.at(-1))return null;
-    let k=x.findIndex(v=>v>=t);
+    if(!Number.isFinite(t)||!x.length||t<x[0]||t>x.at(-1))return null;
+    // Binary search keeps background interpolation O(n log n), rather than O(n²).
+    let lo=0,hi=x.length-1;
+    while(lo<hi){const mid=(lo+hi)>>>1;if(x[mid]<t)lo=mid+1;else hi=mid;}
+    const k=lo;
     if(Math.abs(x[k]-t)<1e-12)return y[k];
     if(k===0||x[k]-x[k-1]>gap)return null;
     return y[k-1]+(t-x[k-1])*(y[k]-y[k-1])/(x[k]-x[k-1]);
@@ -28,7 +31,7 @@ const ECAnalysis = (() => {
     validateOptions(cfg);
     const smooth=y.map((_,i)=>median(y.slice(Math.max(0,i-2),i+3)));
     const amplitude=-quantile(smooth,0.1);
-    if(amplitude<=0||Math.max(...smooth)-Math.min(...smooth)<0.3*amplitude)return null;
+    if(amplitude<=0||smooth.reduce((a,b)=>Math.max(a,b),-Infinity)-smooth.reduce((a,b)=>Math.min(a,b),Infinity)<0.3*amplitude)return null;
     const mask=smooth.map((v,i)=>{const a=Math.max(0,i-2),b=Math.min(x.length-1,i+2);return Math.abs((smooth[b]-smooth[a])/(x[b]-x[a]))<=amplitude*cfg.slope_fraction_per_V&&v< -0.6*amplitude;});
     const candidates=[];let start=null;
     for(let i=0;i<=x.length;i++){
@@ -97,7 +100,8 @@ const ECAnalysis = (() => {
     const check=(code,status,reason,value=null)=>checks.push({code,status,reason,value});let bg=null;
     if(sample.n2){const [nx,ny]=curve(sample.n2.E,sample.n2.j),values=x.map(e=>interp(nx,ny,e));if(values.some(v=>v===null))check('n2_background','Invalid','N2 does not cover the full O2 sweep without gaps');else{bg=values;check('n2_background','Good','N2 background subtracted');}}
     else check('n2_background','Check recommended','N2 background unavailable; ORR remains uncorrected');
-    const y=raw.map((v,i)=>v-(bg?bg[i]:0)),p=plateau(x,y,cfg),jl=p?p.jlim_mA_cm2:null;
+    const backgroundInvalid=!!sample.n2&&!bg;
+    const y=raw.map((v,i)=>v-(bg?bg[i]:0)),p=backgroundInvalid?null:plateau(x,y,cfg),jl=p?p.jlim_mA_cm2:null;
     check('plateau',p?'Good':'Invalid',p?'Continuous low-derivative cathodic plateau detected':'No resolved diffusion plateau; no min(j) fallback',p);
     const cv=cvAnalysis(sample.cv,loading),stability=cv.stability_fraction;
     check('cv_stability',stability!==null&&stability<=cfg.stability_fraction?'Good':'Check recommended',stability!==null?'Last two comparable anodic sweeps RMS difference':'At least two complete anodic sweeps required',stability);
@@ -120,7 +124,7 @@ const ECAnalysis = (() => {
     const row=(fields,vals)=>Object.fromEntries(fields.map((k,i)=>[k,vals[i]]));
     return {sample_id:sid,metrics,qc:{status,checks},plateau:p,cv,tafel:tf,metadata:sample.metadata||{},settings:{loading_mg_cm2:loading,qc_options:cfg,tafel_range_V:[lo,hi],cv:Object.fromEntries(Object.entries(sample.cv||{}).filter(([k])=>!['E','j'].includes(k)))},
       processed_cv:(sample.cv?.E||[]).map((e,i)=>row(cvFields,[sid,i,e,sample.cv.j[i]])),
-      processed_orr:x.map((e,i)=>row(orrFields,[sid,i,e,raw[i],bg?bg[i]:null,y[i],!!(p&&p.start_V<=e&&e<=p.end_V)]))};
+      processed_orr:x.map((e,i)=>row(orrFields,[sid,i,e,raw[i],bg?bg[i]:null,backgroundInvalid?null:y[i],!!(p&&p.start_V<=e&&e<=p.end_V)]))};
   }
   function analyzeBatch(samples){const ids=samples.map(s=>String(s.sample_id));if(!ids.length||ids.some(s=>!s.trim())||new Set(ids).size!==ids.length)throw Error('Provide nonempty, unique sample IDs');return {schema_version:'1.0.0',units:{potential:'V vs RHE',current_density:'mA/cm2',loading:'mgPt/cm2'},samples:samples.map(analyzeSample)};}
   function csv(fields,rows){const cell=v=>v===null||v===undefined?'':typeof v==='boolean'?(v?'True':'False'):'"'+String(v).replaceAll('"','""')+'"';return [fields.join(','),...rows.map(r=>fields.map(k=>cell(r[k])).join(','))].join('\r\n')+'\r\n';}

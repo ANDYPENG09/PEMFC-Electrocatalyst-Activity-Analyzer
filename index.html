@@ -416,8 +416,11 @@ const ECAnalysis = (() => {
     return [[...E],[...j]];
   }
   function interp(x,y,t,gap=0.025){
-    if(t<x[0]||t>x.at(-1))return null;
-    let k=x.findIndex(v=>v>=t);
+    if(!Number.isFinite(t)||!x.length||t<x[0]||t>x.at(-1))return null;
+    // Binary search keeps background interpolation O(n log n), rather than O(n²).
+    let lo=0,hi=x.length-1;
+    while(lo<hi){const mid=(lo+hi)>>>1;if(x[mid]<t)lo=mid+1;else hi=mid;}
+    const k=lo;
     if(Math.abs(x[k]-t)<1e-12)return y[k];
     if(k===0||x[k]-x[k-1]>gap)return null;
     return y[k-1]+(t-x[k-1])*(y[k]-y[k-1])/(x[k]-x[k-1]);
@@ -427,7 +430,7 @@ const ECAnalysis = (() => {
     validateOptions(cfg);
     const smooth=y.map((_,i)=>median(y.slice(Math.max(0,i-2),i+3)));
     const amplitude=-quantile(smooth,0.1);
-    if(amplitude<=0||Math.max(...smooth)-Math.min(...smooth)<0.3*amplitude)return null;
+    if(amplitude<=0||smooth.reduce((a,b)=>Math.max(a,b),-Infinity)-smooth.reduce((a,b)=>Math.min(a,b),Infinity)<0.3*amplitude)return null;
     const mask=smooth.map((v,i)=>{const a=Math.max(0,i-2),b=Math.min(x.length-1,i+2);return Math.abs((smooth[b]-smooth[a])/(x[b]-x[a]))<=amplitude*cfg.slope_fraction_per_V&&v< -0.6*amplitude;});
     const candidates=[];let start=null;
     for(let i=0;i<=x.length;i++){
@@ -496,7 +499,8 @@ const ECAnalysis = (() => {
     const check=(code,status,reason,value=null)=>checks.push({code,status,reason,value});let bg=null;
     if(sample.n2){const [nx,ny]=curve(sample.n2.E,sample.n2.j),values=x.map(e=>interp(nx,ny,e));if(values.some(v=>v===null))check('n2_background','Invalid','N2 does not cover the full O2 sweep without gaps');else{bg=values;check('n2_background','Good','N2 background subtracted');}}
     else check('n2_background','Check recommended','N2 background unavailable; ORR remains uncorrected');
-    const y=raw.map((v,i)=>v-(bg?bg[i]:0)),p=plateau(x,y,cfg),jl=p?p.jlim_mA_cm2:null;
+    const backgroundInvalid=!!sample.n2&&!bg;
+    const y=raw.map((v,i)=>v-(bg?bg[i]:0)),p=backgroundInvalid?null:plateau(x,y,cfg),jl=p?p.jlim_mA_cm2:null;
     check('plateau',p?'Good':'Invalid',p?'Continuous low-derivative cathodic plateau detected':'No resolved diffusion plateau; no min(j) fallback',p);
     const cv=cvAnalysis(sample.cv,loading),stability=cv.stability_fraction;
     check('cv_stability',stability!==null&&stability<=cfg.stability_fraction?'Good':'Check recommended',stability!==null?'Last two comparable anodic sweeps RMS difference':'At least two complete anodic sweeps required',stability);
@@ -519,7 +523,7 @@ const ECAnalysis = (() => {
     const row=(fields,vals)=>Object.fromEntries(fields.map((k,i)=>[k,vals[i]]));
     return {sample_id:sid,metrics,qc:{status,checks},plateau:p,cv,tafel:tf,metadata:sample.metadata||{},settings:{loading_mg_cm2:loading,qc_options:cfg,tafel_range_V:[lo,hi],cv:Object.fromEntries(Object.entries(sample.cv||{}).filter(([k])=>!['E','j'].includes(k)))},
       processed_cv:(sample.cv?.E||[]).map((e,i)=>row(cvFields,[sid,i,e,sample.cv.j[i]])),
-      processed_orr:x.map((e,i)=>row(orrFields,[sid,i,e,raw[i],bg?bg[i]:null,y[i],!!(p&&p.start_V<=e&&e<=p.end_V)]))};
+      processed_orr:x.map((e,i)=>row(orrFields,[sid,i,e,raw[i],bg?bg[i]:null,backgroundInvalid?null:y[i],!!(p&&p.start_V<=e&&e<=p.end_V)]))};
   }
   function analyzeBatch(samples){const ids=samples.map(s=>String(s.sample_id));if(!ids.length||ids.some(s=>!s.trim())||new Set(ids).size!==ids.length)throw Error('Provide nonempty, unique sample IDs');return {schema_version:'1.0.0',units:{potential:'V vs RHE',current_density:'mA/cm2',loading:'mgPt/cm2'},samples:samples.map(analyzeSample)};}
   function csv(fields,rows){const cell=v=>v===null||v===undefined?'':typeof v==='boolean'?(v?'True':'False'):'"'+String(v).replaceAll('"','""')+'"';return [fields.join(','),...rows.map(r=>fields.map(k=>cell(r[k])).join(','))].join('\r\n')+'\r\n';}
@@ -543,7 +547,7 @@ if(typeof module!=='undefined')module.exports=ECAnalysis;
 "use strict";
 const $ = id => document.getElementById(id);
 const num = id => { const v = parseFloat($(id).value); return isNaN(v) ? NaN : v; };
-const fmt = (x, n=3) => isNaN(x) ? "\u2014" : x.toFixed(n);
+const fmt = (x, n=3) => !Number.isFinite(x) ? "\u2014" : x.toFixed(n);
 
 /* ===== Example Data ===== */
 const EXAMPLE_CV = `0.02668	-9.4167E-5
@@ -1752,7 +1756,7 @@ function qspecCmC(){
 /* ===== Pt Loading ===== */
 function computePtLoad(){
   const c = num("inkConc"), vd = num("dropVol"), A = num("area"), f = num("ptFrac");
-  if (isNaN(c) || isNaN(vd) || isNaN(A) || A === 0 || isNaN(f)) {
+  if (![c,vd,A,f].every(v=>Number.isFinite(v)&&v>0) || f>100) {
     $("ptLoad").value = ""; return NaN;
   }
   const tot = c * vd / A;
@@ -1765,10 +1769,13 @@ function computePtLoad(){
 function parse2col(txt, potU, curU){
   const pf = unitFactor(potU), cf = unitFactor(curU);
   const rows = [];
-  for (const line of txt.split(/\r?\n/)){
-    const s = line.trim(); if (!s || s.startsWith("#")) continue;
-    const parts = s.split(/[\s,;\t]+/).map(Number);
-    if (parts.length >= 2 && Number.isFinite(parts[0]) && Number.isFinite(parts[1])) rows.push([parts[0]*pf, parts[1]*cf]);
+  for (const [index,line] of txt.split(/\r?\n/).entries()){
+    const s=line.trim();if(!s||s.startsWith('#'))continue;
+    const tokens=s.includes(',')||s.includes(';')?s.split(/[,;]/).map(t=>t.trim()):s.split(/\s+/);
+    const parts=tokens.map(t=>t===''?NaN:Number(t));
+    if(rows.length===0&&tokens.length===2&&/^(potential|voltage|E(?:\s|\(|$)|电位)/i.test(tokens[0])&&/^(current|I(?:\s|\(|$)|j(?:\s|\(|$)|电流)/i.test(tokens[1]))continue;
+    if(parts.length!==2||!parts.every(Number.isFinite))throw Error(`Invalid two-column data on line ${index+1} / 第 ${index+1} 行应为两个有效数值`);
+    rows.push([parts[0]*pf,parts[1]*cf]);
   }
   return rows;
 }
@@ -1866,6 +1873,7 @@ function svgChart(el, series, opt){
   if (yCeilSet) ymax = opt.ymax;
   if (xFloorSet) xmin = opt.xmin;
   if (xCeilSet) xmax = opt.xmax;
+  if (((xFloorSet||xCeilSet)&&xmin>=xmax)||((yFloorSet||yCeilSet)&&ymin>=ymax)){alert('Axis minimum must be less than maximum / 坐标轴下限必须小于上限');return;}
   if (xmin === xmax) xmax = xmin + 1;
   if (ymin === ymax) ymax = ymin + 1;
   const ypad = (ymax - ymin) * 0.08;
@@ -1899,8 +1907,8 @@ function svgChart(el, series, opt){
   };
   const yt = niceAxis(ymin, ymax, opt.yticks || 6);
   const xt = niceAxis(xmin, xmax, 6);
-  ymin = yt.min; ymax = yt.max;
-  xmin = xt.min; xmax = xt.max;
+  ymin = yFloorSet?ymin:yt.min; ymax = yCeilSet?ymax:yt.max;
+  xmin = xFloorSet?xmin:xt.min; xmax = xCeilSet?xmax:xt.max;
   const X = v => pad.l + (v - xmin)/(xmax - xmin) * (W - pad.l - pad.r);
   const Y = v => H - pad.b - (v - ymin)/(ymax - ymin) * (H - pad.t - pad.b);
   // Integer when on step; 0.5-step uses 1 decimal; otherwise 2 decimals
@@ -1917,19 +1925,21 @@ function svgChart(el, series, opt){
   s += `<line x1="${pad.l}" y1="${H-pad.b}" x2="${W-pad.r}" y2="${H-pad.b}" stroke="#d2d2d7"/>`;
   s += `<line x1="${pad.l}" y1="${pad.t}" x2="${pad.l}" y2="${H-pad.b}" stroke="#d2d2d7"/>`;
   // Y grid + ticks (nice)
-  for (let v = yt.min; v <= yt.max + yt.step * 1e-9; v += yt.step){
+  for (let v = Math.ceil(ymin/yt.step)*yt.step; v <= ymax + yt.step * 1e-9; v += yt.step){
     const y = Y(v);
     s += `<line x1="${pad.l}" y1="${y}" x2="${W-pad.r}" y2="${y}" stroke="#f0f0f2"/>`;
     s += `<text x="${pad.l-6}" y="${y+3}" text-anchor="end" font-size="10" fill="#6e6e73">${fmtTick(v, yt.step)}</text>`;
   }
   // X grid + ticks (nice)
-  for (let v = xt.min; v <= xt.max + xt.step * 1e-9; v += xt.step){
+  for (let v = Math.ceil(xmin/xt.step)*xt.step; v <= xmax + xt.step * 1e-9; v += xt.step){
     const x = X(v);
     s += `<line x1="${x}" y1="${pad.t}" x2="${x}" y2="${H-pad.b}" stroke="#f0f0f2"/>`;
     s += `<text x="${x}" y="${H-pad.b+14}" text-anchor="middle" font-size="10" fill="#6e6e73">${fmtTick(v, xt.step)}</text>`;
   }
   s += `<text x="${W/2}" y="${H-legendHeight-4}" text-anchor="middle" font-size="11" fill="#424245">${escape(opt.xlabel||"E (V)")}</text>`;
-  s += `<text x="12" y="${H/2}" text-anchor="middle" font-size="11" fill="#424245" transform="rotate(-90 12 ${H/2})">${escape(opt.ylabel||"J (mA/cm²)")}</text>`;
+  s += `<text x="12" y="${(pad.t+H-pad.b)/2}" text-anchor="middle" font-size="11" fill="#424245" transform="rotate(-90 12 ${(pad.t+H-pad.b)/2})">${escape(opt.ylabel||"J (mA/cm²)")}</text>`;
+  const clipId='clip-'+el.id;
+  s+=`<defs><clipPath id="${clipId}"><rect x="${pad.l}" y="${pad.t}" width="${W-pad.l-pad.r}" height="${H-pad.t-pad.b}"/></clipPath></defs><g clip-path="url(#${clipId})">`;
   (opt.regions||[]).forEach(r => {
     const x0 = X(r.x0), x1 = X(r.x1);
     s += `<rect data-annotation="region" x="${Math.min(x0,x1)}" y="${pad.t}" width="${Math.abs(x1-x0)}" height="${H-pad.b-pad.t}" fill="${r.color||"#0071e3"}" opacity="0.10"/>`;
@@ -1951,6 +1961,7 @@ function svgChart(el, series, opt){
   (opt.markers||[]).forEach(m => {
     s += `<circle data-annotation="marker" cx="${X(m.x).toFixed(1)}" cy="${Y(m.y).toFixed(1)}" r="4" fill="${m.color||"#d70015"}"><title>${escape(m.label||"")}</title></circle>`;
   });
+  s+=`</g>`;
   named.forEach((se,i) => {
     const y = 309 + i*17;
     s += `<line x1="60" x2="84" y1="${y}" y2="${y}" stroke="${se.color}" stroke-width="2"/><text data-i18n-skip="true" x="92" y="${y+4}" font-size="11" fill="#1d1d1f" ${se.name.length>60?'textLength="430" lengthAdjust="spacingAndGlyphs"':''}>${escape(se.name)}</text>`;
@@ -1964,77 +1975,36 @@ function getSVG(el){ return el.querySelector("svg"); }
 let lastAnodicSweep = null;
 let lastFullCycle = null;
 
+let ecsaResult=null;
 function calcECSA(){
-  lastFullCycle=null; lastAnodicSweep=null; lastCvZoom=null;
-  ['o_SH','o_QH','o_ecsa','o_ecsa_cm2','o_rf'].forEach(id=>$(id).textContent='—');
-  $('cvPlotFull').replaceChildren(); $('cvPlotZoom').replaceChildren(); updateSummary();
-  const A = num("area"); if (!(A>0)) return;
-  const v = scanRateV(), q = qspecCmC(), m = computePtLoad();
-  if (isNaN(v) || v <= 0 || isNaN(q) || isNaN(m) || m <= 0){
-    ["o_SH","o_QH","o_ecsa","o_ecsa_cm2","o_rf"].forEach(id => $(id).textContent = "\u2014");
-    updateSummary(); return;
-  }
-  const rows = parse2col($("cvText").value, $("cvPotUnit").value, $("cvCurUnit").value);
-  if (rows.length < 2){
-    ["o_SH","o_QH","o_ecsa","o_ecsa_cm2","o_rf"].forEach(id => $(id).textContent = "\u2014");
-    updateSummary(); return;
-  }
-  const X = rows.map(r => r[0]);
-  const I = rows.map(r => r[1]);
-  const J = I.map(i => i * 1000 / A);
-  lastFullCycle = { X, Y: J };
-
-  const lo = num("hlo"), hi = num("hhi");
-  if (isNaN(lo) || isNaN(hi) || lo >= hi){
-    $("cvMsg").textContent = "Hupd range is invalid."; return;
-  }
-  const segs = splitSweeps(X, J);
-  const anodic = segs.filter(([sx, sy]) =>
-    sx.length >= 2 && sx[sx.length-1] > sx[0] &&
-    sx.some((x, i) => x >= lo && x <= hi && sy[i] > 0)
-  ).pop();
-  if (!anodic){
-    $("cvMsg").textContent = "No stable sweep segment with a forward Hupd desorption peak was identified.";
-    return;
-  }
-  lastAnodicSweep = anodic;
-  const [sx, sy] = anodic;
-  const pts = sx.map((x, i) => [x, sy[i]]).filter(([x, y]) => x >= lo && x <= hi && y > 0);
-  if (pts.length < 2){
-    $("cvMsg").textContent = "Insufficient positive current data for the Hupd peak."; return;
-  }
-  pts.sort((a, b) => a[0] - b[0]);
-  const px = pts.map(p => p[0]), py = pts.map(p => p[1]);
-  // Baseline = current density at 0.40 V on the anodic sweep (read directly from the curve, no lo-boundary interpolation)
-  const mode = $("baselineMode").value;
-  let j_bg;
-  if (mode === "manual"){
-    const b = parseFloat($("baseline").value);
-    j_bg = isNaN(b) ? interp(0.40, sx, sy) : b;
-  } else {
-    j_bg = interp(0.40, sx, sy);
-  }
-  // Skip region where curve is below the baseline (count only peak above j_bg; excludes reverse / negative area)
-  let startIdx = 0;
-  for (let i = 0; i < py.length; i++){ if (py[i] >= j_bg){ startIdx = i; break; } }
-  const pxI = px.slice(startIdx), pyI = py.slice(startIdx);
-  let area = 0;
-  for (let i = 1; i < pxI.length; i++){
-    area += (pxI[i] - pxI[i-1]) * (Math.max(0,pyI[i-1] - j_bg) + Math.max(0,pyI[i] - j_bg)) / 2;
-  }
-  const SH = Math.abs(area);
-  const QH = SH / v;
-  const ecsa_m2g = 100 * SH / (q * v * m);
-  const ecsa_cm2 = QH * A / q;
-  const rf = ecsa_cm2 / A;
-  $("o_SH").textContent = fmt(SH, 5);
-  $("o_QH").textContent = fmt(QH, 4);
-  $("o_ecsa").textContent = fmt(ecsa_m2g, 2);
-  $("o_ecsa_cm2").textContent = fmt(ecsa_cm2, 3);
-  $("o_rf").textContent = fmt(rf, 2);
-  $("cvMsg").textContent = `S_H = ${SH.toFixed(5)} mA\u00B7V/cm\u00B2; baseline j_bg = j@0.40V = ${j_bg.toFixed(5)} mA/cm\u00B2 (read directly from the anodic sweep curve).`;
-  updateSummary();
-  drawCvPlots(lo, hi, pxI, pyI, j_bg);
+  invalidateCv();
+  try{
+    const A=num('area'),v=scanRateV(),q=qspecCmC(),m=computePtLoad(),lo=num('hlo'),hi=num('hhi');
+    if(![A,v,q,m].every(x=>Number.isFinite(x)&&x>0))throw Error('Area, scan rate, charge and Pt loading must be positive / 面积、扫描速率、电荷与载量必须为正值');
+    if(![lo,hi].every(Number.isFinite)||lo>=hi)throw Error('Invalid Hupd range / 积分范围无效');
+    const rows=parse2col($('cvText').value,$('cvPotUnit').value,$('cvCurUnit').value);
+    const X=rows.map(r=>r[0]),Y=rows.map(r=>r[1]*1000/A);
+    const cv={E:X,j:Y,scan_rate_V_s:v,q_mC_cm2:q,hupd_range_V:[lo,hi]};
+    if($('baselineMode').value==='manual'){
+      const baseline=num('baseline');
+      if(!Number.isFinite(baseline))throw Error('Enter a finite manual baseline / 请填写有效手动基线');
+      cv.baseline_mA_cm2=baseline;
+    }
+    const result=ECAnalysis.cvAnalysis(cv,m/1000);
+    if(!Number.isFinite(result.SH_mA_V_cm2))throw Error('No anodic sweep covers the integration range / 没有完整覆盖积分范围的阳极扫描');
+    const [sx,sy]=ECAnalysis.sweeps(X,Y).filter(([x])=>x.at(-1)>x[0]&&x[0]<=lo&&x.at(-1)>=hi).at(-1);
+    const keep=sx.map((x,i)=>i===0||x>sx[i-1]),xx=sx.filter((_,i)=>keep[i]),yy=sy.filter((_,i)=>keep[i]);
+    const px=[lo,...xx.filter(x=>x>lo&&x<hi),hi],baseline=result.baseline_mA_cm2;
+    // The shaded polygon is the same positive, baseline-subtracted area used by the core.
+    const py=px.map(x=>Math.max(baseline,ECAnalysis.interp(xx,yy,x,Infinity)));
+    lastFullCycle={X,Y};lastAnodicSweep=[xx,yy];ecsaResult=result;
+    const SH=result.SH_mA_V_cm2,QH=SH/v,area=QH*A/q;
+    $('o_SH').textContent=fmt(SH,5);$('o_QH').textContent=fmt(QH,4);
+    $('o_ecsa').textContent=fmt(result.ecsa_m2_g,2);$('o_ecsa_cm2').textContent=fmt(area,3);$('o_rf').textContent=fmt(area/A,2);
+    $('cvMsg').textContent=`S_H = ${SH.toFixed(5)} mA·V/cm²; baseline = ${baseline.toFixed(5)} mA/cm²; ${$('baselineMode').value==='manual'?'manual / 手动':`j@${hi.toFixed(3)} V / 积分上限基线`}.`;
+    drawCvPlots(lo,hi,px,py,baseline);
+  }catch(e){$('cvMsg').textContent=e.message;}
+  finally{calcORR();}
 }
 
 /* ===== Plotting ===== */
@@ -2072,11 +2042,8 @@ function calcORR(){
   let jk = NaN;
   if (jlabs > Math.abs(jE)) jk = Math.abs(jE) * jlabs / (jlabs - Math.abs(jE));
   const ma = jk / 1000 / (m / 1000);
-  const v = scanRateV(), q = qspecCmC();
-  const SHt = parseFloat($("o_SH").textContent);
-  let ecsa_m2g = NaN;
-  if (!(isNaN(v) || isNaN(q) || isNaN(m) || isNaN(SHt))) ecsa_m2g = 100 * SHt / (q * v * m);
-  const sa = isNaN(ecsa_m2g) ? NaN : jk / (ecsa_m2g * (m/1e6) * 10000);
+  const ecsa_m2g=ecsaResult?.ecsa_m2_g;
+  const sa=Number.isFinite(ecsa_m2g)&&ecsa_m2g>0?jk/(ecsa_m2g*(m/1e6)*10000):NaN;
   $("o_jk").textContent = fmt(jk, 3);
   $("o_ma").textContent = fmt(ma, 4);
   $("o_sa").textContent = fmt(sa, 3);
@@ -2163,7 +2130,7 @@ $("lsvBtn").addEventListener("click", () => {
 
 /* ===== Clear ===== */
 $("cvClear").addEventListener("click", () => {
-  lastFullCycle=null; lastAnodicSweep=null; lastCvZoom=null;
+  invalidateCv();
   $("cvText").value = ""; $("baseline").value = "";
   ["o_SH","o_QH","o_ecsa","o_ecsa_cm2","o_rf"].forEach(id => $(id).textContent = "\u2014");
   $("cvMsg").textContent = "Cleared.";
@@ -2326,6 +2293,7 @@ $("cvText").addEventListener("input", () => { });
 $("loadExample").addEventListener("click", loadExampleData);
 
 function invalidateCv(){
+  ecsaResult=null;
   lastFullCycle=null;lastAnodicSweep=null;lastCvZoom=null;$('cvPlotFull').replaceChildren();$('cvPlotZoom').replaceChildren();
   ['o_SH','o_QH','o_ecsa','o_ecsa_cm2','o_rf'].forEach(id=>$(id).textContent='—');calcORR();
 }
@@ -2407,7 +2375,7 @@ document.querySelector('.frac-tag[data-f="30"]').classList.add("active");
     }
     if($('cvText').value.trim()){
       s.cv={...read('cvText','cvPotUnit','cvCurUnit'),scan_rate_V_s:scanRateV(),q_mC_cm2:qspecCmC(),hupd_range_V:[num('hlo'),num('hhi')]};
-      if($('baselineMode').value==='manual'&&$('baseline').value.trim())s.cv.baseline_mA_cm2=num('baseline');
+      if($('baselineMode').value==='manual'){if(!Number.isFinite(num('baseline')))throw Error('Enter a finite manual baseline / 请填写有效手动基线');s.cv.baseline_mA_cm2=num('baseline');}
     }s.input_state=Object.fromEntries(inputIds.map(id=>[id,$(id).value]));s.saved_at=new Date().toISOString();return s;
   }
   function render(){
@@ -2435,7 +2403,7 @@ document.querySelector('.frac-tag[data-f="30"]').classList.add("active");
       const list=text('ul','',detail);s.qc.checks.forEach(c=>text('li',`${c.status}: ${c.reason}${checkDetail(c)}`,list));
     });
     for(const [id,key,jkey,title] of [['wbCvPlot','processed_cv','j_mA_cm2','CV comparison'],['wbOrrPlot','processed_orr','j_corrected_mA_cm2','ORR comparison']]){
-      const series=analysis.samples.map((s,i)=>({name:s.sample_id,x:s[key].map(r=>r.potential_V_RHE),y:s[key].map(r=>r[jkey]),color:colors[i%colors.length]})).filter(s=>selected.has(s.name)&&s.x.length);
+      const series=analysis.samples.map((s,i)=>({name:s.sample_id,x:s[key].filter(r=>Number.isFinite(r[jkey])).map(r=>r.potential_V_RHE),y:s[key].filter(r=>Number.isFinite(r[jkey])).map(r=>r[jkey]),color:colors[i%colors.length]})).filter(s=>selected.has(s.name)&&s.x.length);
       if(series.length)svgChart($(id),series,{title,xlabel:'E (V vs RHE)',ylabel:'j (mA/cm²)'});
     }
     for(const name of ['analysis.json','results.csv','processed_cv.csv','processed_orr.csv','summary.csv']){
@@ -2463,6 +2431,7 @@ document.querySelector('.frac-tag[data-f="30"]').classList.add("active");
       for(const f of $('wbFiles').files){
         const p=JSON.parse(await f.text()),items=p.samples||[p];if(!Array.isArray(items))throw Error('Invalid samples JSON');
         for(const item of items){
+          if(item?.qc?.checks?.some(c=>c.code==='n2_background'&&c.status==='Invalid'))throw Error('Invalid N2 analysis cannot be reconstructed; import the raw history backup / N₂ 无效分析无法重建，请导入原始历史备份');
           let raw=item;
           // Reimport analysis.json as well as raw history; retain original raw O2/N2 when present.
           if(!item.orr&&Array.isArray(item.processed_orr)){
