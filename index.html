@@ -264,12 +264,13 @@
       <input type="number" id="Ep" step="any" value="0.90">
     </div>
     <div class="field">
-      <label>j<sub>lim</sub> Evaluation Potential (V)</label>
+      <label>Manual j<sub>lim</sub> Evaluation Potential (V)</label>
+      <select id="jlimMode" aria-label="Limiting current method"><option value="auto">Auto diffusion plateau (recommended)</option><option value="manual">Manual potential (legacy)</option></select>
       <input type="number" id="jlimE" step="any" value="0.40">
     </div>
   </div>
 
-  <details class="advanced">
+  <details class="advanced" id="lsvData" open>
     <summary>LSV Data (O<sub>2</sub> + N<sub>2</sub> Background)</summary>
     <div class="grid g-3">
       <div class="field"><label>O<sub>2</sub> Potential</label><select id="o2PotUnit"><option value="V" selected>V</option><option value="mV">mV</option><option value="uV">µV</option></select></div>
@@ -322,21 +323,231 @@
       </tr>
     </tbody>
   </table>
+  <fieldset id="exportOptions" style="border:1px solid var(--line);border-radius:10px;padding:12px;margin-top:16px">
+    <legend>Figure contents · 导出图内容</legend>
+    <div style="display:flex;gap:18px;flex-wrap:wrap">
+      <label><input type="checkbox" id="exportCv" checked style="width:auto"> ECSA–CV</label>
+      <label><input type="checkbox" id="exportLsv" checked style="width:auto"> LSV</label>
+      <label><input type="checkbox" id="exportHupd" style="width:auto"> Hupd integration panel · 积分区间图</label>
+      <label><input type="checkbox" id="exportMetrics" style="width:auto"> Results table · 数据汇总</label>
+      <label><input type="checkbox" id="exportAnnotations" style="width:auto"> Shading and markers · 阴影与标记</label>
+    </div>
+    <label for="exportLayout">Layout · 排版</label><select id="exportLayout"><option value="compact">Compact · 紧凑排列</option><option value="wide">16:9 · 演示文稿</option></select>
+    <p class="hint">Select only the panels you need. Shading and markers affect PNG exports, not calculations. · 仅导出勾选内容；阴影与标记选项仅影响图片，不改变计算。</p>
+  </fieldset>
   <div class="btn-row">
     <button class="btn-secondary btn" id="exportCsv">Export CSV</button>
-    <button class="btn-secondary btn" id="summaryPng">Export Summary (16:9)</button>
+    <button class="btn-secondary btn" id="summaryPng">Export selected figure · 导出所选图</button>
   </div>
 </div>
 
-<footer>MIT License &middot; Author: ANDYPENG09 &middot; Pure HTML/JS &middot; Offline &middot; No Origin Required</footer>
+<!-- WORKBENCH START -->
+<section class="card" id="workbench">
+  <div class="card-title">Analysis Workbench · 自动 QC / 多样品比较</div>
+  <p class="hint">Capture the current CV/O₂/N₂ inputs, or import sample JSON files. Each capture is a snapshot; recapture after changing inputs. Analysis uses cathodic currents and a continuous diffusion plateau. Missing results are shown as —.</p>
+  <div class="grid g-4">
+    <div class="field"><label for="wbName">Sample name · 样品名称</label><input id="wbName" value="Sample-1" maxlength="80"></div>
+    <div class="field"><label for="wbRef">Input potential reference</label><select id="wbRef"><option>RHE</option><option>SHE</option><option>AgAgCl_satKCl</option><option>AgAgCl_3M</option><option>SCE</option><option>MSE</option></select></div>
+    <div class="field"><label for="wbPH">pH (25 °C)</label><input id="wbPH" type="number" value="0" step="any"></div>
+    <div class="field"><label for="wbRu">Additional uncompensated Ru (Ω)</label><input id="wbRu" type="number" value="0" min="0" step="any"></div>
+  </div>
+  <p class="hint">RHE conversion and E − I·Ru apply only to captured workbench data. Use Ru = 0 if already corrected. Hupd bounds above are interpreted in V vs RHE here. Original manual calculators remain available.</p>
+  <div class="grid g-4">
+    <div class="field"><label for="wbWidth">Minimum plateau width (V)</label><input id="wbWidth" type="number" value="0.08" min="0.001" step="0.01"></div>
+    <div class="field"><label for="wbSlope">Plateau slope / amplitude (V⁻¹)</label><input id="wbSlope" type="number" value="0.15" min="0.001" step="0.01"></div>
+    <div class="field"><label for="wbTafelLo">Tafel lower bound (V RHE)</label><input id="wbTafelLo" type="number" value="0.85" step="0.01"></div>
+    <div class="field"><label for="wbTafelHi">Tafel upper bound (V RHE)</label><input id="wbTafelHi" type="number" value="0.95" step="0.01"></div>
+  </div>
+  <div class="btn-row"><button class="btn" id="wbCapture">Analyze &amp; add current sample</button><button class="btn btn-secondary" id="wbDemo">Load two-sample demo</button><button class="btn btn-danger" id="wbClear">Clear comparison</button></div>
+  <p class="hint">History is saved in this browser. Back up JSON before moving the HTML or clearing browser data. · 历史保存在当前浏览器；移动 HTML 或清理浏览器前请备份 JSON。</p>
+  <div class="btn-row"><button class="btn btn-secondary" id="wbBackup">Back up history · 备份历史</button><button class="btn btn-secondary" id="wbSelectAll">Select all · 全选</button><button class="btn btn-secondary" id="wbSelectNone">Select none · 全不选</button></div>
+  <p class="hint" id="wbStorage" role="status"></p>
+  <div class="field"><label for="wbFiles">Import one or more sample JSON files (see README schema)</label><input type="file" id="wbFiles" accept=".json" multiple></div>
+  <p id="wbMessage" role="status" aria-live="polite"></p>
+  <div style="overflow-x:auto"><table class="summary" id="wbTable"></table></div>
+  <p id="wbLegend" class="hint"></p>
+  <div class="grid g-2"><div class="plot" id="wbCvPlot"></div><div class="plot" id="wbOrrPlot"></div></div>
+  <div id="wbQC"></div>
+  <div class="btn-row" id="wbDownloads"></div>
+  <div style="display:flex;gap:20px;margin:12px 0">
+    <label><input type="checkbox" id="wbExportCv" checked style="width:auto"> CV comparison · CV 比较</label>
+    <label><input type="checkbox" id="wbExportLsv" checked style="width:auto"> LSV comparison · LSV 比较</label>
+  </div>
+  <p class="hint">Checked samples appear in plots and analysis exports; history backup includes all samples. · 勾选样品用于绘图和分析导出；历史备份包含全部样品。</p>
+  <button class="btn btn-secondary" id="wbPlotDownload">Download comparison plots</button>
+</section>
+<section class="card">
+  <div class="card-title">Multi-rpm Koutecký–Levich · 多转速拟合</div>
+  <p class="hint">Paste/import CSV: rpm,potential_V_RHE,j_mA_cm2. Supply a single corrected ORR sweep per rpm, at least three distinct speeds. Values must already be in V vs RHE and mA/cm²; no background or potential correction is applied here.</p>
+  <textarea id="klText" aria-label="Multi-rpm CSV" placeholder="rpm,potential_V_RHE,j_mA_cm2&#10;400,0.895,-1.5&#10;400,0.905,-1.4"></textarea>
+  <div class="field"><label for="klFiles">Import one or more multi-rpm CSV files</label><input type="file" id="klFiles" accept=".csv,.txt" multiple></div>
+  <div class="grid g-4">
+    <div class="field"><label for="klE">Fit potential (V RHE)</label><input id="klE" type="number" value="0.9" step="0.01"></div>
+    <div class="field"><label for="klD">O₂ diffusion D (cm²/s), optional</label><input id="klD" type="number" step="any" placeholder="e.g. 1.9e-5"></div>
+    <div class="field"><label for="klNu">Kinematic viscosity ν (cm²/s)</label><input id="klNu" type="number" step="any" placeholder="e.g. 0.01"></div>
+    <div class="field"><label for="klC">O₂ concentration C (mol/cm³)</label><input id="klC" type="number" step="any" placeholder="e.g. 1.2e-6"></div>
+  </div>
+  <div class="btn-row"><button class="btn" id="klRun">Fit K–L</button><button class="btn btn-secondary" id="klDemo">Load K–L demo</button><button class="btn btn-secondary" id="klDownload">Download K–L JSON</button></div>
+  <pre id="klResult" style="white-space:pre-wrap" aria-live="polite"></pre><div class="plot" id="klPlot"></div>
+</section>
+<!-- WORKBENCH END -->
+<footer>v1.2.2 &middot; MIT License &middot; Author: ANDYPENG09 &middot; Pure HTML/JS &middot; Offline &middot; No Origin Required</footer>
 
 </div>
 
+<!-- ANALYSIS CORE START -->
+<script>
+/* Pure offline analysis core. Keep numerical rules aligned with electrochem_analysis.py. */
+const ECAnalysis = (() => {
+  const defaults = {min_width_V:0.08,min_points:7,slope_fraction_per_V:0.15,max_gap_V:0.025,
+    transport_ratio:0.8,stability_fraction:0.05,sensitivity_fraction:0.1};
+  const resultFields=['sample_id','ecsa_m2_g','ehalf_V','jlim_mA_cm2','ma_0_9V_A_mg','sa_0_9V_mA_cm2_Pt','tafel_mV_dec','qc_status'];
+  const cvFields=['sample_id','point_index','potential_V_RHE','j_mA_cm2'];
+  const orrFields=['sample_id','point_index','potential_V_RHE','j_raw_mA_cm2','j_background_mA_cm2','j_corrected_mA_cm2','in_plateau'];
+  const summaryFields=['record_type','sample_id','point_index','potential_V_RHE','j_mA_cm2','j_raw_mA_cm2','j_background_mA_cm2','j_corrected_mA_cm2','in_plateau','ecsa_m2_g','ehalf_V','jlim_mA_cm2','ma_0_9V_A_mg','sa_0_9V_mA_cm2_Pt','tafel_mV_dec','qc_status'];
+  const mean=a=>a.reduce((s,v)=>s+v,0)/a.length;
+  function quantile(a,q){const b=[...a].sort((a,b)=>a-b),p=(b.length-1)*q,k=Math.floor(p);return b[k]+(b[Math.min(k+1,b.length-1)]-b[k])*(p-k);}
+  const median=a=>quantile(a,0.5);
+  function validateOptions(cfg){if(Object.values(cfg).some(v=>!Number.isFinite(v)||v<=0))throw Error('QC thresholds must be finite and positive');if(!Number.isInteger(cfg.min_points)||cfg.min_points<3||cfg.transport_ratio>=1)throw Error('Use min_points >=3 and transport_ratio <1');}
+  function curve(E,j){
+    if(!Array.isArray(E)||!Array.isArray(j)||E.length!==j.length||E.length<2||![...E,...j].every(Number.isFinite)) throw Error('A curve needs finite paired points');
+    if(E.slice(1).every((v,i)=>v<E[i])) return [[...E].reverse(),[...j].reverse()];
+    if(!E.slice(1).every((v,i)=>v>E[i])) throw Error('Use one monotonic sweep with unique potentials');
+    return [[...E],[...j]];
+  }
+  function interp(x,y,t,gap=0.025){
+    if(!Number.isFinite(t)||!x.length||t<x[0]||t>x.at(-1))return null;
+    // Binary search keeps background interpolation O(n log n), rather than O(n²).
+    let lo=0,hi=x.length-1;
+    while(lo<hi){const mid=(lo+hi)>>>1;if(x[mid]<t)lo=mid+1;else hi=mid;}
+    const k=lo;
+    if(Math.abs(x[k]-t)<1e-12)return y[k];
+    if(k===0||x[k]-x[k-1]>gap)return null;
+    return y[k-1]+(t-x[k-1])*(y[k]-y[k-1])/(x[k]-x[k-1]);
+  }
+  function plateau(E,j,options={}){
+    const cfg={...defaults,...options},[x,y]=curve(E,j);
+    validateOptions(cfg);
+    const smooth=y.map((_,i)=>median(y.slice(Math.max(0,i-2),i+3)));
+    const amplitude=-quantile(smooth,0.1);
+    if(amplitude<=0||smooth.reduce((a,b)=>Math.max(a,b),-Infinity)-smooth.reduce((a,b)=>Math.min(a,b),Infinity)<0.3*amplitude)return null;
+    const mask=smooth.map((v,i)=>{const a=Math.max(0,i-2),b=Math.min(x.length-1,i+2);return Math.abs((smooth[b]-smooth[a])/(x[b]-x[a]))<=amplitude*cfg.slope_fraction_per_V&&v< -0.6*amplitude;});
+    const candidates=[];let start=null;
+    for(let i=0;i<=x.length;i++){
+      const eligible=i<x.length&&mask[i],gap=i>0&&i<x.length&&x[i]-x[i-1]>cfg.max_gap_V;
+      if(start!==null&&(!eligible||gap)){
+        const end=i-1;
+        if(end-start+1>=cfg.min_points&&x[end]-x[start]>=cfg.min_width_V){
+          const vals=y.slice(start,end+1),med=median(vals),avg=mean(vals);
+          candidates.push({start_V:x[start],end_V:x[end],jlim_mA_cm2:med,mad_mA_cm2:median(vals.map(v=>Math.abs(v-med))),std_mA_cm2:Math.sqrt(mean(vals.map(v=>(v-avg)**2))),count:vals.length});
+        }start=null;
+      }if(eligible&&start===null)start=i;
+    }
+    if(!candidates.length)return null;
+    const best=candidates.reduce((a,b)=>b.end_V-b.start_V>a.end_V-a.start_V?b:a);
+    return {...best,candidates,method:'contiguous_low_derivative_median'};
+  }
+  function halfWave(E,j,jl){
+    const [x,y]=curve(E,j);if(jl===null||!Number.isFinite(jl)||jl>=0)return null;
+    for(let i=0;i<x.length-1;i++)if(y[i]<=jl/2&&jl/2<y[i+1]&&x[i+1]-x[i]<=defaults.max_gap_V)return x[i]+(jl/2-y[i])*(x[i+1]-x[i])/(y[i+1]-y[i]);
+    return null;
+  }
+  function kinetic(j,jl){return j===null||jl===null||j>=0||jl>=0||Math.abs(j)>=Math.abs(jl)?null:Math.abs(j)*Math.abs(jl)/(Math.abs(jl)-Math.abs(j));}
+  function sweeps(x,y){
+    if(x.length!==y.length||x.length<2||![...x,...y].every(Number.isFinite))throw Error('Invalid CV points');
+    const out=[];let start=0,direction=0;
+    for(let i=1;i<x.length;i++){const sign=Math.sign(x[i]-x[i-1]);if(sign&&direction&&sign!==direction){if(i-start>=3)out.push([x.slice(start,i),y.slice(start,i)]);start=i-1;}if(sign)direction=sign;}
+    if(x.length-start>=3)out.push([x.slice(start),y.slice(start)]);return out;
+  }
+  function cvAnalysis(cv,loading){
+    const empty={ecsa_m2_g:null,stability_fraction:null,anodic_sweeps:0};if(!cv)return empty;
+    const [lo,hi]=cv.hupd_range_V||[0.05,0.4],rate=cv.scan_rate_V_s??0.02,q=cv.q_mC_cm2??0.21;
+    if(![rate,q,lo,hi].every(Number.isFinite)||rate<=0||q<=0||lo>=hi)throw Error('Invalid CV integration parameters');
+    const branches=sweeps(cv.E,cv.j).filter(([x])=>x.at(-1)>x[0]&&x[0]<=lo&&x.at(-1)>=hi).map(([x,y])=>{const keep=x.map((v,i)=>i===0||v>x[i-1]);return [x.filter((v,i)=>keep[i]),y.filter((v,i)=>keep[i])];});
+    if(!branches.length)return empty;
+    const [x,y]=branches.at(-1),baseline=cv.baseline_mA_cm2??interp(x,y,hi,Infinity);
+    if(!Number.isFinite(baseline))throw Error('CV baseline must be finite');
+    const xx=[lo,...x.filter(v=>v>lo&&v<hi),hi],yy=xx.map(v=>Math.max(0,interp(x,y,v,Infinity)-baseline));
+    let sh=0;for(let i=1;i<xx.length;i++)sh+=(xx[i]-xx[i-1])*(yy[i]+yy[i-1])/2;
+    let stability=null;
+    if(branches.length>=2){const [a,b]=branches.slice(-2),l=Math.max(a[0][0],b[0][0]),h=Math.min(a[0].at(-1),b[0].at(-1)),grid=Array.from({length:101},(_,i)=>l+(h-l)*i/100),ya=grid.map(v=>interp(...a,v,Infinity)),yb=grid.map(v=>interp(...b,v,Infinity));stability=Math.sqrt(mean(ya.map((v,i)=>(v-yb[i])**2)))/Math.max(Math.sqrt(mean(yb.map(v=>v*v))),1e-12);}
+    return {ecsa_m2_g:loading&&sh>0?100*sh/(q*rate*loading*1000):null,stability_fraction:stability,anodic_sweeps:branches.length,SH_mA_V_cm2:sh,baseline_mA_cm2:baseline};
+  }
+  function fitLine(x,y){
+    const mx=mean(x),my=mean(y),den=x.reduce((s,v)=>s+(v-mx)**2,0);if(x.length<2||den<1e-24)throw Error('Insufficient independent fit points');
+    const slope=x.reduce((s,v,i)=>s+(v-mx)*(y[i]-my),0)/den,intercept=my-slope*mx,total=y.reduce((s,v)=>s+(v-my)**2,0);
+    return {slope,intercept,r2:total>1e-24?1-y.reduce((s,v,i)=>s+(v-slope*x[i]-intercept)**2,0)/total:null};
+  }
+  function klFit(traces,potential_V=0.9,D_cm2_s=null,nu_cm2_s=null,C_mol_cm3=null){
+    if(!Number.isFinite(potential_V))throw Error('K-L potential must be finite');
+    const rpm=[],currents=[];
+    for(const t of traces){if(!Number.isFinite(t.rpm)||t.rpm<=0||rpm.includes(t.rpm))throw Error('K-L requires distinct positive rpm');const [x,y]=curve(t.E,t.j),j=interp(x,y,potential_V);if(j===null||j>=0)throw Error('K-L needs a covered potential and negative ORR current at every rpm');rpm.push(t.rpm);currents.push(j);}
+    if(rpm.length<3)throw Error('K-L requires at least three distinct rpm');
+    const xs=rpm.map(v=>(2*Math.PI*v/60)**-0.5),ys=currents.map(v=>1/v),fit=fitLine(xs,ys),valid=fit.slope< -1e-12&&fit.intercept< -1e-12,reasons=valid?[]:['Nonphysical slope/intercept; jk and n unavailable'];
+    if(fit.r2===null||fit.r2<0.98)reasons.push('K-L R2 below 0.98 or undefined');
+    let n=null;const params=[D_cm2_s,nu_cm2_s,C_mol_cm3];
+    if(params.some(v=>v!==null&&(!Number.isFinite(v)||v<=0)))throw Error('Transport parameters must be finite and positive');
+    if(valid&&params.every(v=>v!==null)){n=1/(Math.abs(fit.slope)*1000*0.620*96485.33212*D_cm2_s**(2/3)*nu_cm2_s**(-1/6)*C_mol_cm3);if(n>4.2||n<1)reasons.push('Estimated ORR electron number outside 1–4.2; review assumptions');}
+    else if(params.some(v=>v===null))reasons.push('n unavailable: supply D, kinematic viscosity and oxygen concentration');
+    return {...fit,potential_V,jk_mA_cm2:valid?1/fit.intercept:null,n,rpm,j_mA_cm2:currents,omega_inv_sqrt:xs,inverse_j:ys,status:!valid?'Invalid':reasons.length?'Check recommended':'Good',reasons,D_cm2_s,nu_cm2_s,C_mol_cm3};
+  }
+  function analyzeSample(sample){
+    const sid=String(sample.sample_id),cfg={...defaults,...sample.qc_options},loading=sample.loading_mg_cm2??null;
+    validateOptions(cfg);
+    if(loading!==null&&(!Number.isFinite(loading)||loading<=0))throw Error('Pt loading must be finite and positive');
+    const [x,raw]=curve(sample.orr.E,sample.orr.j),checks=[];
+    const check=(code,status,reason,value=null)=>checks.push({code,status,reason,value});let bg=null;
+    if(sample.n2){const [nx,ny]=curve(sample.n2.E,sample.n2.j),values=x.map(e=>interp(nx,ny,e));if(values.some(v=>v===null))check('n2_background','Invalid','N2 does not cover the full O2 sweep without gaps');else{bg=values;check('n2_background','Good','N2 background subtracted');}}
+    else check('n2_background','Check recommended','N2 background unavailable; ORR remains uncorrected');
+    const backgroundInvalid=!!sample.n2&&!bg;
+    const y=raw.map((v,i)=>v-(bg?bg[i]:0)),p=backgroundInvalid?null:plateau(x,y,cfg),jl=p?p.jlim_mA_cm2:null;
+    check('plateau',p?'Good':'Invalid',p?'Continuous low-derivative cathodic plateau detected':'No resolved diffusion plateau; no min(j) fallback',p);
+    const cv=cvAnalysis(sample.cv,loading),stability=cv.stability_fraction;
+    check('cv_stability',stability!==null&&stability<=cfg.stability_fraction?'Good':'Check recommended',stability!==null?'Last two comparable anodic sweeps RMS difference':'At least two complete anodic sweeps required',stability);
+    const j09=interp(x,y,0.9),ratio=j09!==null&&jl?Math.abs(j09/jl):null,jk=kinetic(j09,jl);
+    check('transport_0_9V',jk===null?'Invalid':ratio>=cfg.transport_ratio?'Check recommended':'Good',jk===null?'0.9 V missing, wrong current sign, or |j| >= |jlim|':'|j(0.9V)| / |jlim|; review at >=0.8',ratio);
+    const variants=[];
+    if(p){const vals=y.filter((_,i)=>x[i]>=p.start_V&&x[i]<=p.end_V);variants.push(quantile(vals,0.1),quantile(vals,0.9));for(const f of [0.5,1.5]){const alt=plateau(x,y,{...cfg,slope_fraction_per_V:cfg.slope_fraction_per_V*f});if(alt)variants.push(...alt.candidates.map(c=>c.jlim_mA_cm2));}}
+    const jlSens=variants.length?Math.max(...variants.map(v=>Math.abs(v-jl)/Math.abs(jl))):null,ks=variants.map(v=>kinetic(j09,v)),goodKs=ks.filter(v=>v!==null),maSens=jk&&goodKs.length?Math.max(...goodKs.map(v=>Math.abs(v-jk)/jk)):null,singular=ks.length>0&&ks.some(v=>v===null);
+    check('plateau_sensitivity',singular?'Invalid':maSens!==null&&Math.max(jlSens,maSens)<=cfg.sensitivity_fraction?'Good':'Check recommended','Compare plateau P10/P90 and derivative thresholds x0.5/x1.5; MA sensitivity equals jk sensitivity',{jlim_relative:jlSens,ma_relative:maSens,singular});
+    const ecsa=cv.ecsa_m2_g;if(loading===null||ecsa===null)check('normalization','Check recommended','MA requires Pt loading; SA requires positive Hupd ECSA');
+    const ehalf=halfWave(x,y,jl);check('ehalf',ehalf!==null?'Good':'Invalid',ehalf!==null?'Half-plateau rising crossing':'Half-wave crossing not resolved');
+    const [lo,hi]=sample.tafel_range_V||[0.85,0.95],tx=[],ty=[];
+    if(![lo,hi].every(Number.isFinite)||lo>=hi)throw Error('Invalid Tafel potential range');
+    x.forEach((e,i)=>{const k=kinetic(y[i],jl);if(lo<=e&&e<=hi&&k&&Math.abs(y[i]/jl)<cfg.transport_ratio){tx.push(Math.log10(k));ty.push(e);}});
+    let tf=null;if(tx.length>=5&&Math.max(...tx)-Math.min(...tx)>=0.3){const fit=fitLine(tx,ty);if(fit.slope<0)tf={...fit,slope_mV_dec:Math.abs(fit.slope)*1000,count:tx.length,range_V:[lo,hi]};}
+    check('tafel',tf&&tf.r2!==null&&tf.r2>=0.98?'Good':'Check recommended','Kinetic-current Tafel fit; >=5 points and >=0.3 decades required',tf);
+    if(p&&p.std_mA_cm2/Math.abs(jl)>0.05)check('plateau_dispersion','Check recommended','Plateau standard deviation exceeds 5% of |jlim|');
+    const status=checks.some(c=>c.status==='Invalid')?'Invalid':checks.some(c=>c.status==='Check recommended')?'Check recommended':'Good';
+    const metrics={ecsa_m2_g:ecsa,ehalf_V:ehalf,jlim_mA_cm2:jl,ma_0_9V_A_mg:jk&&loading?jk/1000/loading:null,sa_0_9V_mA_cm2_Pt:jk&&ecsa&&loading?jk/(ecsa*loading*10):null,tafel_mV_dec:tf?tf.slope_mV_dec:null};
+    const row=(fields,vals)=>Object.fromEntries(fields.map((k,i)=>[k,vals[i]]));
+    return {sample_id:sid,metrics,qc:{status,checks},plateau:p,cv,tafel:tf,metadata:sample.metadata||{},settings:{loading_mg_cm2:loading,qc_options:cfg,tafel_range_V:[lo,hi],cv:Object.fromEntries(Object.entries(sample.cv||{}).filter(([k])=>!['E','j'].includes(k)))},
+      processed_cv:(sample.cv?.E||[]).map((e,i)=>row(cvFields,[sid,i,e,sample.cv.j[i]])),
+      processed_orr:x.map((e,i)=>row(orrFields,[sid,i,e,raw[i],bg?bg[i]:null,backgroundInvalid?null:y[i],!!(p&&p.start_V<=e&&e<=p.end_V)]))};
+  }
+  function analyzeBatch(samples){const ids=samples.map(s=>String(s.sample_id));if(!ids.length||ids.some(s=>!s.trim())||new Set(ids).size!==ids.length)throw Error('Provide nonempty, unique sample IDs');return {schema_version:'1.0.0',units:{potential:'V vs RHE',current_density:'mA/cm2',loading:'mgPt/cm2'},samples:samples.map(analyzeSample)};}
+  function csv(fields,rows){const cell=v=>v===null||v===undefined?'':typeof v==='boolean'?(v?'True':'False'):'"'+String(v).replaceAll('"','""')+'"';return [fields.join(','),...rows.map(r=>fields.map(k=>cell(r[k])).join(','))].join('\r\n')+'\r\n';}
+  function summaryRows(analysis){
+    const rows=[];
+    for(const s of analysis.samples){
+      rows.push({record_type:'metrics',sample_id:s.sample_id,...s.metrics,qc_status:s.qc.status});
+      s.processed_cv.forEach(r=>rows.push({record_type:'cv_point',sample_id:s.sample_id,point_index:r.point_index,potential_V_RHE:r.potential_V_RHE,j_mA_cm2:r.j_mA_cm2}));
+      s.processed_orr.forEach(r=>rows.push({record_type:'lsv_point',sample_id:s.sample_id,point_index:r.point_index,potential_V_RHE:r.potential_V_RHE,j_mA_cm2:r.j_corrected_mA_cm2,j_raw_mA_cm2:r.j_raw_mA_cm2,j_background_mA_cm2:r.j_background_mA_cm2,j_corrected_mA_cm2:r.j_corrected_mA_cm2,in_plateau:r.in_plateau}));
+    }
+    return rows;
+  }
+  function exports(analysis){return {'analysis.json':JSON.stringify(analysis,null,2),'results.csv':csv(resultFields,analysis.samples.map(s=>({sample_id:s.sample_id,...s.metrics,qc_status:s.qc.status}))),'processed_cv.csv':csv(cvFields,analysis.samples.flatMap(s=>s.processed_cv)),'processed_orr.csv':csv(orrFields,analysis.samples.flatMap(s=>s.processed_orr)),'summary.csv':csv(summaryFields,summaryRows(analysis))};}
+  return {defaults,plateau,halfWave,kinetic,curve,interp,sweeps,cvAnalysis,klFit,analyzeSample,analyzeBatch,exports,resultFields,summaryFields,summaryRows};
+})();
+if(typeof module!=='undefined')module.exports=ECAnalysis;
+
+</script>
+<!-- ANALYSIS CORE END -->
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
 const num = id => { const v = parseFloat($(id).value); return isNaN(v) ? NaN : v; };
-const fmt = (x, n=3) => isNaN(x) ? "\u2014" : x.toFixed(n);
+const fmt = (x, n=3) => !Number.isFinite(x) ? "\u2014" : x.toFixed(n);
 
 /* ===== Example Data ===== */
 const EXAMPLE_CV = `0.02668	-9.4167E-5
@@ -1545,7 +1756,7 @@ function qspecCmC(){
 /* ===== Pt Loading ===== */
 function computePtLoad(){
   const c = num("inkConc"), vd = num("dropVol"), A = num("area"), f = num("ptFrac");
-  if (isNaN(c) || isNaN(vd) || isNaN(A) || A === 0 || isNaN(f)) {
+  if (![c,vd,A,f].every(v=>Number.isFinite(v)&&v>0) || f>100) {
     $("ptLoad").value = ""; return NaN;
   }
   const tot = c * vd / A;
@@ -1558,10 +1769,13 @@ function computePtLoad(){
 function parse2col(txt, potU, curU){
   const pf = unitFactor(potU), cf = unitFactor(curU);
   const rows = [];
-  for (const line of txt.split(/\r?\n/)){
-    const s = line.trim(); if (!s || s.startsWith("#")) continue;
-    const parts = s.split(/[\s,;\t]+/).map(Number).filter(x => !isNaN(x));
-    if (parts.length >= 2) rows.push([parts[0]*pf, parts[1]*cf]);
+  for (const [index,line] of txt.split(/\r?\n/).entries()){
+    const s=line.trim();if(!s||s.startsWith('#'))continue;
+    const tokens=s.includes(',')||s.includes(';')?s.split(/[,;]/).map(t=>t.trim()):s.split(/\s+/);
+    const parts=tokens.map(t=>t===''?NaN:Number(t));
+    if(rows.length===0&&tokens.length===2&&/^(potential|voltage|E(?:\s|\(|$)|电位)/i.test(tokens[0])&&/^(current|I(?:\s|\(|$)|j(?:\s|\(|$)|电流)/i.test(tokens[1]))continue;
+    if(parts.length!==2||!parts.every(Number.isFinite))throw Error(`Invalid two-column data on line ${index+1} / 第 ${index+1} 行应为两个有效数值`);
+    rows.push([parts[0]*pf,parts[1]*cf]);
   }
   return rows;
 }
@@ -1638,13 +1852,19 @@ function splitSweeps(X, Y){
 /* ===== SVG Chart ===== */
 function svgChart(el, series, opt){
   opt = opt || {};
-  const W = 540, H = 300, pad = {l:54, r:16, t:28, b:40};
+  const named = series.filter(se => se.name);
+  const legendHeight = named.length * 17;
+  const W = 540, H = 300 + legendHeight, pad = {l:54, r:16, t:28, b:40 + legendHeight};
+  const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
   let xs = [], ys = [];
   series.forEach(s => s.x.forEach((v,i) => { xs.push(v); ys.push(s.y[i]); }));
   (opt.markers||[]).forEach(m => { xs.push(m.x); ys.push(m.y); });
   (opt.regions||[]).forEach(r => { xs.push(r.x0); xs.push(r.x1); });
-  let xmin = Math.min(...xs), xmax = Math.max(...xs);
-  let ymin = Math.min(...ys), ymax = Math.max(...ys);
+  if (!xs.length || !ys.length || !xs.every(Number.isFinite) || !ys.every(Number.isFinite)) {
+    el.replaceChildren(); return;
+  }
+  const bounds = values => values.reduce(([lo,hi],v)=>[Math.min(lo,v),Math.max(hi,v)],[Infinity,-Infinity]);
+  let [xmin,xmax] = bounds(xs), [ymin,ymax] = bounds(ys);
   const yFloorSet = (opt.ymin !== undefined);
   const yCeilSet = (opt.ymax !== undefined);
   const xFloorSet = (opt.xmin !== undefined);
@@ -1653,6 +1873,7 @@ function svgChart(el, series, opt){
   if (yCeilSet) ymax = opt.ymax;
   if (xFloorSet) xmin = opt.xmin;
   if (xCeilSet) xmax = opt.xmax;
+  if (((xFloorSet||xCeilSet)&&xmin>=xmax)||((yFloorSet||yCeilSet)&&ymin>=ymax)){alert('Axis minimum must be less than maximum / 坐标轴下限必须小于上限');return;}
   if (xmin === xmax) xmax = xmin + 1;
   if (ymin === ymax) ymax = ymin + 1;
   const ypad = (ymax - ymin) * 0.08;
@@ -1686,8 +1907,8 @@ function svgChart(el, series, opt){
   };
   const yt = niceAxis(ymin, ymax, opt.yticks || 6);
   const xt = niceAxis(xmin, xmax, 6);
-  ymin = yt.min; ymax = yt.max;
-  xmin = xt.min; xmax = xt.max;
+  ymin = yFloorSet?ymin:yt.min; ymax = yCeilSet?ymax:yt.max;
+  xmin = xFloorSet?xmin:xt.min; xmax = xCeilSet?xmax:xt.max;
   const X = v => pad.l + (v - xmin)/(xmax - xmin) * (W - pad.l - pad.r);
   const Y = v => H - pad.b - (v - ymin)/(ymax - ymin) * (H - pad.t - pad.b);
   // Integer when on step; 0.5-step uses 1 decimal; otherwise 2 decimals
@@ -1700,31 +1921,33 @@ function svgChart(el, series, opt){
     return v.toFixed(d);
   };
   let s = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" style="background:#fff;">`;
-  s += `<text x="${W/2}" y="18" text-anchor="middle" font-size="12" fill="#1d1d1f" font-weight="600">${opt.title||""}</text>`;
+  s += `<text x="${W/2}" y="18" text-anchor="middle" font-size="12" fill="#1d1d1f" font-weight="600">${escape(opt.title||"")}</text>`;
   s += `<line x1="${pad.l}" y1="${H-pad.b}" x2="${W-pad.r}" y2="${H-pad.b}" stroke="#d2d2d7"/>`;
   s += `<line x1="${pad.l}" y1="${pad.t}" x2="${pad.l}" y2="${H-pad.b}" stroke="#d2d2d7"/>`;
   // Y grid + ticks (nice)
-  for (let v = yt.min; v <= yt.max + yt.step * 1e-9; v += yt.step){
+  for (let v = Math.ceil(ymin/yt.step)*yt.step; v <= ymax + yt.step * 1e-9; v += yt.step){
     const y = Y(v);
     s += `<line x1="${pad.l}" y1="${y}" x2="${W-pad.r}" y2="${y}" stroke="#f0f0f2"/>`;
     s += `<text x="${pad.l-6}" y="${y+3}" text-anchor="end" font-size="10" fill="#6e6e73">${fmtTick(v, yt.step)}</text>`;
   }
   // X grid + ticks (nice)
-  for (let v = xt.min; v <= xt.max + xt.step * 1e-9; v += xt.step){
+  for (let v = Math.ceil(xmin/xt.step)*xt.step; v <= xmax + xt.step * 1e-9; v += xt.step){
     const x = X(v);
     s += `<line x1="${x}" y1="${pad.t}" x2="${x}" y2="${H-pad.b}" stroke="#f0f0f2"/>`;
     s += `<text x="${x}" y="${H-pad.b+14}" text-anchor="middle" font-size="10" fill="#6e6e73">${fmtTick(v, xt.step)}</text>`;
   }
-  s += `<text x="${W/2}" y="${H-4}" text-anchor="middle" font-size="11" fill="#424245">${opt.xlabel||"E (V)"}</text>`;
-  s += `<text x="12" y="${H/2}" text-anchor="middle" font-size="11" fill="#424245" transform="rotate(-90 12 ${H/2})">${opt.ylabel||"J (mA/cm²)"}</text>`;
+  s += `<text x="${W/2}" y="${H-legendHeight-4}" text-anchor="middle" font-size="11" fill="#424245">${escape(opt.xlabel||"E (V)")}</text>`;
+  s += `<text x="12" y="${(pad.t+H-pad.b)/2}" text-anchor="middle" font-size="11" fill="#424245" transform="rotate(-90 12 ${(pad.t+H-pad.b)/2})">${escape(opt.ylabel||"J (mA/cm²)")}</text>`;
+  const clipId='clip-'+el.id;
+  s+=`<defs><clipPath id="${clipId}"><rect x="${pad.l}" y="${pad.t}" width="${W-pad.l-pad.r}" height="${H-pad.t-pad.b}"/></clipPath></defs><g clip-path="url(#${clipId})">`;
   (opt.regions||[]).forEach(r => {
     const x0 = X(r.x0), x1 = X(r.x1);
-    s += `<rect x="${Math.min(x0,x1)}" y="${pad.t}" width="${Math.abs(x1-x0)}" height="${H-pad.b-pad.t}" fill="${r.color||"#0071e3"}" opacity="0.10"/>`;
+    s += `<rect data-annotation="region" x="${Math.min(x0,x1)}" y="${pad.t}" width="${Math.abs(x1-x0)}" height="${H-pad.b-pad.t}" fill="${r.color||"#0071e3"}" opacity="0.10"/>`;
   });
   (opt.fills||[]).forEach(f => {
     const pts = f.x.map((v,i)=>`${X(v).toFixed(1)},${Y(f.y[i]).toFixed(1)}`).join(" ");
     const base = f.base.slice().reverse().map((v,i)=>`${X(f.x[f.base.length-1-i]).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
-    s += `<polygon points="${pts} ${base}" fill="${f.color||"#0071e3"}" opacity="0.22"/>`;
+    s += `<polygon data-annotation="fill" points="${pts} ${base}" fill="${f.color||"#0071e3"}" opacity="0.22"/>`;
   });
   series.forEach(se => {
     if (se.dashed){
@@ -1736,7 +1959,12 @@ function svgChart(el, series, opt){
     }
   });
   (opt.markers||[]).forEach(m => {
-    s += `<circle cx="${X(m.x).toFixed(1)}" cy="${Y(m.y).toFixed(1)}" r="4" fill="${m.color||"#d70015"}"><title>${m.label||""}</title></circle>`;
+    s += `<circle data-annotation="marker" cx="${X(m.x).toFixed(1)}" cy="${Y(m.y).toFixed(1)}" r="4" fill="${m.color||"#d70015"}"><title>${escape(m.label||"")}</title></circle>`;
+  });
+  s+=`</g>`;
+  named.forEach((se,i) => {
+    const y = 309 + i*17;
+    s += `<line x1="60" x2="84" y1="${y}" y2="${y}" stroke="${se.color}" stroke-width="2"/><text data-i18n-skip="true" x="92" y="${y+4}" font-size="11" fill="#1d1d1f" ${se.name.length>60?'textLength="430" lengthAdjust="spacingAndGlyphs"':''}>${escape(se.name)}</text>`;
   });
   s += `</svg>`;
   el.innerHTML = s;
@@ -1747,74 +1975,36 @@ function getSVG(el){ return el.querySelector("svg"); }
 let lastAnodicSweep = null;
 let lastFullCycle = null;
 
+let ecsaResult=null;
 function calcECSA(){
-  const A = num("area"); if (isNaN(A)) return;
-  const v = scanRateV(), q = qspecCmC(), m = computePtLoad();
-  if (isNaN(v) || v === 0 || isNaN(q) || isNaN(m) || m === 0){
-    ["o_SH","o_QH","o_ecsa","o_ecsa_cm2","o_rf"].forEach(id => $(id).textContent = "\u2014");
-    updateSummary(); return;
-  }
-  const rows = parse2col($("cvText").value, $("cvPotUnit").value, $("cvCurUnit").value);
-  if (rows.length < 2){
-    ["o_SH","o_QH","o_ecsa","o_ecsa_cm2","o_rf"].forEach(id => $(id).textContent = "\u2014");
-    updateSummary(); return;
-  }
-  const X = rows.map(r => r[0]);
-  const I = rows.map(r => r[1]);
-  const J = I.map(i => i * 1000 / A);
-  lastFullCycle = { X, Y: J };
-
-  const lo = num("hlo"), hi = num("hhi");
-  if (isNaN(lo) || isNaN(hi) || lo >= hi){
-    $("cvMsg").textContent = "Hupd range is invalid."; return;
-  }
-  const segs = splitSweeps(X, J);
-  const anodic = segs.filter(([sx, sy]) =>
-    sx.length >= 2 && sx[sx.length-1] > sx[0] &&
-    sx.some((x, i) => x >= lo && x <= hi && sy[i] > 0)
-  ).pop();
-  if (!anodic){
-    $("cvMsg").textContent = "No stable sweep segment with a forward Hupd desorption peak was identified.";
-    return;
-  }
-  lastAnodicSweep = anodic;
-  const [sx, sy] = anodic;
-  const pts = sx.map((x, i) => [x, sy[i]]).filter(([x, y]) => x >= lo && x <= hi && y > 0);
-  if (pts.length < 2){
-    $("cvMsg").textContent = "Insufficient positive current data for the Hupd peak."; return;
-  }
-  pts.sort((a, b) => a[0] - b[0]);
-  const px = pts.map(p => p[0]), py = pts.map(p => p[1]);
-  // Baseline = current density at 0.40 V on the anodic sweep (read directly from the curve, no lo-boundary interpolation)
-  const mode = $("baselineMode").value;
-  let j_bg;
-  if (mode === "manual"){
-    const b = parseFloat($("baseline").value);
-    j_bg = isNaN(b) ? interp(0.40, sx, sy) : b;
-  } else {
-    j_bg = interp(0.40, sx, sy);
-  }
-  // Skip region where curve is below the baseline (count only peak above j_bg; excludes reverse / negative area)
-  let startIdx = 0;
-  for (let i = 0; i < py.length; i++){ if (py[i] >= j_bg){ startIdx = i; break; } }
-  const pxI = px.slice(startIdx), pyI = py.slice(startIdx);
-  let area = 0;
-  for (let i = 1; i < pxI.length; i++){
-    area += (pxI[i] - pxI[i-1]) * ((pyI[i-1] - j_bg) + (pyI[i] - j_bg)) / 2;
-  }
-  const SH = Math.abs(area);
-  const QH = SH / v;
-  const ecsa_m2g = 100 * SH / (q * v * m);
-  const ecsa_cm2 = QH * A / q;
-  const rf = ecsa_cm2 / A;
-  $("o_SH").textContent = fmt(SH, 5);
-  $("o_QH").textContent = fmt(QH, 4);
-  $("o_ecsa").textContent = fmt(ecsa_m2g, 2);
-  $("o_ecsa_cm2").textContent = fmt(ecsa_cm2, 3);
-  $("o_rf").textContent = fmt(rf, 2);
-  $("cvMsg").textContent = `S_H = ${SH.toFixed(5)} mA\u00B7V/cm\u00B2; baseline j_bg = j@0.40V = ${j_bg.toFixed(5)} mA/cm\u00B2 (read directly from the anodic sweep curve).`;
-  updateSummary();
-  drawCvPlots(lo, hi, pxI, pyI, j_bg);
+  invalidateCv();
+  try{
+    const A=num('area'),v=scanRateV(),q=qspecCmC(),m=computePtLoad(),lo=num('hlo'),hi=num('hhi');
+    if(![A,v,q,m].every(x=>Number.isFinite(x)&&x>0))throw Error('Area, scan rate, charge and Pt loading must be positive / 面积、扫描速率、电荷与载量必须为正值');
+    if(![lo,hi].every(Number.isFinite)||lo>=hi)throw Error('Invalid Hupd range / 积分范围无效');
+    const rows=parse2col($('cvText').value,$('cvPotUnit').value,$('cvCurUnit').value);
+    const X=rows.map(r=>r[0]),Y=rows.map(r=>r[1]*1000/A);
+    const cv={E:X,j:Y,scan_rate_V_s:v,q_mC_cm2:q,hupd_range_V:[lo,hi]};
+    if($('baselineMode').value==='manual'){
+      const baseline=num('baseline');
+      if(!Number.isFinite(baseline))throw Error('Enter a finite manual baseline / 请填写有效手动基线');
+      cv.baseline_mA_cm2=baseline;
+    }
+    const result=ECAnalysis.cvAnalysis(cv,m/1000);
+    if(!Number.isFinite(result.SH_mA_V_cm2))throw Error('No anodic sweep covers the integration range / 没有完整覆盖积分范围的阳极扫描');
+    const [sx,sy]=ECAnalysis.sweeps(X,Y).filter(([x])=>x.at(-1)>x[0]&&x[0]<=lo&&x.at(-1)>=hi).at(-1);
+    const keep=sx.map((x,i)=>i===0||x>sx[i-1]),xx=sx.filter((_,i)=>keep[i]),yy=sy.filter((_,i)=>keep[i]);
+    const px=[lo,...xx.filter(x=>x>lo&&x<hi),hi],baseline=result.baseline_mA_cm2;
+    // The shaded polygon is the same positive, baseline-subtracted area used by the core.
+    const py=px.map(x=>Math.max(baseline,ECAnalysis.interp(xx,yy,x,Infinity)));
+    lastFullCycle={X,Y};lastAnodicSweep=[xx,yy];ecsaResult=result;
+    const SH=result.SH_mA_V_cm2,QH=SH/v,area=QH*A/q;
+    $('o_SH').textContent=fmt(SH,5);$('o_QH').textContent=fmt(QH,4);
+    $('o_ecsa').textContent=fmt(result.ecsa_m2_g,2);$('o_ecsa_cm2').textContent=fmt(area,3);$('o_rf').textContent=fmt(area/A,2);
+    $('cvMsg').textContent=`S_H = ${SH.toFixed(5)} mA·V/cm²; baseline = ${baseline.toFixed(5)} mA/cm²; ${$('baselineMode').value==='manual'?'manual / 手动':`j@${hi.toFixed(3)} V / 积分上限基线`}.`;
+    drawCvPlots(lo,hi,px,py,baseline);
+  }catch(e){$('cvMsg').textContent=e.message;}
+  finally{calcORR();}
 }
 
 /* ===== Plotting ===== */
@@ -1844,7 +2034,7 @@ function drawCvPlots(lo, hi, px, py, j_bg){
 /* ===== ORR ===== */
 function calcORR(){
   const jE = num("jE"), jl = num("jlim"), m = computePtLoad();
-  if (isNaN(jE) || isNaN(jl) || isNaN(m) || m === 0){
+  if (isNaN(jE) || isNaN(jl) || isNaN(m) || m <= 0){
     ["o_jk","o_ma","o_sa"].forEach(id => $(id).textContent = "\u2014");
     updateSummary(); return;
   }
@@ -1852,11 +2042,8 @@ function calcORR(){
   let jk = NaN;
   if (jlabs > Math.abs(jE)) jk = Math.abs(jE) * jlabs / (jlabs - Math.abs(jE));
   const ma = jk / 1000 / (m / 1000);
-  const v = scanRateV(), q = qspecCmC();
-  const SHt = parseFloat($("o_SH").textContent);
-  let ecsa_m2g = NaN;
-  if (!(isNaN(v) || isNaN(q) || isNaN(m) || isNaN(SHt))) ecsa_m2g = 100 * SHt / (q * v * m);
-  const sa = isNaN(ecsa_m2g) ? NaN : jk / (ecsa_m2g * (m/1e6) * 10000);
+  const ecsa_m2g=ecsaResult?.ecsa_m2_g;
+  const sa=Number.isFinite(ecsa_m2g)&&ecsa_m2g>0?jk/(ecsa_m2g*(m/1e6)*10000):NaN;
   $("o_jk").textContent = fmt(jk, 3);
   $("o_ma").textContent = fmt(ma, 4);
   $("o_sa").textContent = fmt(sa, 3);
@@ -1876,50 +2063,74 @@ function updateSummary(){
 /* ===== LSV ===== */
 let lsvResult = null;
 $("lsvBtn").addEventListener("click", () => {
-  const A = num("area"); if (isNaN(A)){ $("lsvMsg").textContent = "RDE area not provided"; return; }
+  try {
+  const A = num("area"); if (!(A>0)) throw Error("RDE area must be positive");
   const o2 = parse2col($("lsvText").value, $("o2PotUnit").value, $("o2CurUnit").value);
-  if (o2.length < 2){ $("lsvMsg").textContent = "Insufficient O\u2082 data"; return; }
-  const o2s = o2.slice().sort((a,b)=>a[0]-b[0]);
-  const X = o2s.map(r => r[0]);
-  const Y = o2s.map(r => r[1] * 1000 / A);
+  if (o2.length < 2) throw Error("Insufficient O2 data");
+  let [X,Y] = ECAnalysis.curve(o2.map(r=>r[0]),o2.map(r=>r[1]*1000/A));
+  let trimmed=0;
   let corrected = Y;
   const n2txt = $("n2Text").value.trim();
   if (n2txt){
     const n2 = parse2col(n2txt, $("o2PotUnit").value, $("n2CurUnit").value);
+    if (n2.length < 2) throw Error("Insufficient N2 data");
     if (n2.length >= 2){
       // N₂ data may be a full CV cycle; do NOT sort (would scramble the cycle).
       // Extract only the ascending (forward) scan before interpolating.
       const nPots = n2.map(r => r[0]);
       const nCurs = n2.map(r => r[1] * 1000 / A);
-      const fwd = extractForwardScan(nPots, nCurs);
-      corrected = Y.map((y, i) => y - interp(X[i], fwd.pots, fwd.curs));
+      let nx=nPots, ny=nCurs;
+      if (!nx.slice(1).every((v,i)=>v>nx[i]) && !nx.slice(1).every((v,i)=>v<nx[i])) {
+        const branch=ECAnalysis.sweeps(nx,ny).filter(([x])=>x.at(-1)>x[0]).at(-1);
+        if(!branch) throw Error('No forward N2 sweep'); [nx,ny]=branch;
+      }
+      [nx,ny]=ECAnalysis.curve(nx,ny);
+      const keep=X.map((e,i)=>({e,j:Y[i]})).filter(p=>p.e>=nx[0]&&p.e<=nx.at(-1));
+      trimmed=X.length-keep.length;
+      if(keep.length<2)throw Error('N2 does not cover the O2 sweep');
+      X=keep.map(p=>p.e);Y=keep.map(p=>p.j);
+      const bg=X.map(e=>ECAnalysis.interp(nx,ny,e));
+      if(bg.some(v=>v===null))throw Error('N2 does not cover the full O2 sweep without gaps');
+      corrected=Y.map((y,i)=>y-bg[i]);
     }
   }
   // Savitzky-Golay smoothing (window 7, 2nd-order) to reduce N₂-correction noise
   corrected = sgSmooth(corrected, 7);
   const jlimE = num("jlimE");
-  const jlim = !isNaN(jlimE) ? interp(jlimE, X, corrected) : Math.min(...corrected);
+  const plateau = ECAnalysis.plateau(X, corrected);
+  const autoPlateau = $("jlimMode").value === "auto";
+  const jlim = autoPlateau ? (plateau ? plateau.jlim_mA_cm2 : NaN) : (!isNaN(jlimE) ? ECAnalysis.interp(X, corrected, jlimE) : NaN);
+  const ehalf = ECAnalysis.halfWave(X, corrected, Number.isFinite(jlim) ? jlim : null);
   const E = num("Ep");
-  const jE = !isNaN(E) ? interp(E, X, corrected) : NaN;
-  $("jlim").value = Math.abs(jlim).toFixed(4);
-  if (!isNaN(jE)) $("jE").value = jE.toFixed(4);
-  $("lsvMsg").textContent = `j_lim@${isNaN(jlimE)?"min":jlimE.toFixed(2)}V = ${jlim.toFixed(3)} mA/cm\u00B2, ` +
-    (isNaN(jE)?"":`j@${E.toFixed(2)}V = ${jE.toFixed(3)} mA/cm\u00B2, `) + (n2txt ? "N\u2082-corrected." : "No N\u2082 correction.");
+  const jE = Number.isFinite(E) ? (ECAnalysis.interp(X, corrected, E) ?? NaN) : NaN;
+  $("jlim").value = Number.isFinite(jlim) ? Math.abs(jlim).toFixed(4) : "";
+  $("jE").value = Number.isFinite(jE) ? jE.toFixed(4) : "";
+  $("lsvMsg").textContent = (autoPlateau ? (plateau ? `Plateau ${plateau.start_V.toFixed(3)}–${plateau.end_V.toFixed(3)} V; median ${jlim.toFixed(3)}, SD ${plateau.std_mA_cm2.toFixed(3)} mA/cm²; ` : "Invalid: no diffusion plateau. ") : `Manual jlim = ${Number.isFinite(jlim)?jlim.toFixed(3):"unavailable"}; `) + `E1/2 = ${ehalf===null?"unavailable":ehalf.toFixed(4)} V; ` +
+    (isNaN(jE)?"":`j@${E.toFixed(2)}V = ${jE.toFixed(3)} mA/cm\u00B2, `) + (n2txt ? "N\u2082-corrected." : "No N\u2082 correction.") + (trimmed ? ` ${trimmed} O2 endpoint(s) outside N2 coverage omitted / 已省略 N₂ 范围外的 O₂ 端点。` : "");
   calcORR();
   lsvResult = { X, Y: corrected };
   const mk = [];
-  if (!isNaN(jlimE)) mk.push({ x: jlimE, y: jlim, color: "#d70015", label: "j_lim" });
-  if (!isNaN(E)) mk.push({ x: E, y: jE, color: "#0071e3", label: "j@E" });
+  if (Number.isFinite(jlim)) mk.push({ x: autoPlateau ? (plateau.start_V+plateau.end_V)/2 : jlimE, y: jlim, color: "#d70015", label: "j_lim" });
+  if (Number.isFinite(E) && Number.isFinite(jE)) mk.push({ x: E, y: jE, color: "#0071e3", label: "j@E" });
   lastLsvX = X; lastLsvY = corrected;
   svgChart($("lsvPlot"), [{ x: X, y: corrected, color: "#00875a" }], Object.assign({
     title: "LSV (N\u2082-corrected)", xlabel: "E (V vs RHE)", ylabel: "J (mA/cm\u00B2)",
-    markers: mk
+    markers: mk,
+    regions: autoPlateau && plateau ? [{x0:plateau.start_V,x1:plateau.end_V,color:"#00875a"}] : []
   }, lsvYOpt()));
   $("lsvPlot").style.display = "block";
+  } catch (error) {
+    $("lsvMsg").textContent = `Invalid: ${error.message}`;
+    $("jlim").value = ""; $("jE").value = "";
+    $("lsvPlot").style.display = "none";
+    lsvResult = null; lastLsvX = null; lastLsvY = null; $("lsvPlot").replaceChildren();
+    calcORR();
+  }
 });
 
 /* ===== Clear ===== */
 $("cvClear").addEventListener("click", () => {
+  invalidateCv();
   $("cvText").value = ""; $("baseline").value = "";
   ["o_SH","o_QH","o_ecsa","o_ecsa_cm2","o_rf"].forEach(id => $(id).textContent = "\u2014");
   $("cvMsg").textContent = "Cleared.";
@@ -1927,6 +2138,7 @@ $("cvClear").addEventListener("click", () => {
   updateSummary();
 });
 $("lsvClear").addEventListener("click", () => {
+  lsvResult=null; lastLsvX=null; lastLsvY=null; $("lsvPlot").replaceChildren();
   $("lsvText").value = ""; $("n2Text").value = "";
   $("jE").value = ""; $("jlim").value = "";
   $("lsvMsg").textContent = "Cleared.";
@@ -1977,151 +2189,59 @@ $("lsvApplyY").addEventListener("click", () => {
 });
 
 /* ===== Export PNG ===== */
-function exportPNG(el, filename){
-  const svg = getSVG(el); if (!svg){ alert("Please generate the plot first."); return; }
-  const transparent = $("pngTransparent") && $("pngTransparent").checked;
-  let xml = new XMLSerializer().serializeToString(svg);
-  if (transparent) xml = xml.split(' style="background:#fff;"').join('');
-  const svg64 = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(xml)));
-  const img = new Image();
-  img.onload = () => {
-    const scale = 2;
-    const canvas = document.createElement("canvas");
-    canvas.width = 540 * scale; canvas.height = 300 * scale;
-    const ctx = canvas.getContext("2d");
-    if (!transparent){ ctx.fillStyle = "#fff"; ctx.fillRect(0,0,canvas.width,canvas.height); }
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    canvas.toBlob(blob => {
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+function exportPNG(el, filename){ return exportPNGCombined([el],filename); }
+function exportSVGCopy(svg){
+  const copy=svg.cloneNode(true);
+  if (!$('exportAnnotations').checked) copy.querySelectorAll('[data-annotation]').forEach(e=>e.remove());
+  if ($('pngTransparent').checked) copy.style.background='none';
+  return copy;
+}
+function saveCanvas(canvas,filename){
+  canvas.toBlob(blob=>{
+    if(!blob){alert('PNG export failed / 图片导出失败');return;}
+    const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=filename;a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  },'image/png');
+}
+async function exportPNGCombined(els, filename){
+  try {
+    if(!els.length)throw Error('Select at least one plot / 请至少勾选一张图');
+    const svgs=els.map(el=>getSVG(el));
+    if(svgs.some(s=>!s))throw Error('Generate each selected plot first / 请先生成所选曲线图');
+    const images=await Promise.all(svgs.map(svg=>new Promise((resolve,reject)=>{
+      const copy=exportSVGCopy(svg),img=new Image();
+      img.onload=()=>resolve({img,w:svg.viewBox.baseVal.width,h:svg.viewBox.baseVal.height});
+      img.onerror=()=>reject(Error('Could not render SVG / 曲线图渲染失败'));
+      img.src='data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(new XMLSerializer().serializeToString(copy))));
+    })));
+    const canvas=document.createElement('canvas'),scale=2;
+    const wide=$('exportLayout').value==='wide';
+    canvas.width=wide?1920:Math.max(...images.map(p=>p.w))*scale;canvas.height=wide?1080:images.reduce((h,p)=>h+p.h,0)*scale;
+    const ctx=canvas.getContext('2d');
+    if(!$('pngTransparent').checked){ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);}
+    let y=0;images.forEach((p,i)=>{
+      if(wide){const cols=images.length===1?1:2,rows=Math.ceil(images.length/cols),cw=canvas.width/cols,ch=canvas.height/rows,k=Math.min((cw-32)/p.w,(ch-32)/p.h);
+        ctx.drawImage(p.img,(i%cols)*cw+(cw-p.w*k)/2,Math.floor(i/cols)*ch+(ch-p.h*k)/2,p.w*k,p.h*k);
+      }else{ctx.drawImage(p.img,0,y,p.w*scale,p.h*scale);y+=p.h*scale;}
     });
-  };
-  img.src = svg64;
+    saveCanvas(canvas,filename);
+  }catch(e){alert(e.message);}
 }
-function exportPNGCombined(els, filename){
-  const svgs = els.map(el => el.querySelector("svg")).filter(Boolean);
-  if (!svgs.length){ alert("Please generate plots first."); return; }
-  const transparent = $("pngTransparent") && $("pngTransparent").checked;
-  const scale = 2, w = 540 * scale, h = 300 * scale;
-  const canvas = document.createElement("canvas");
-  canvas.width = w; canvas.height = h * svgs.length;
-  const ctx = canvas.getContext("2d");
-  if (!transparent){ ctx.fillStyle = "#fff"; ctx.fillRect(0,0,canvas.width,canvas.height); }
-  let loaded = 0;
-  svgs.forEach((svg, idx) => {
-    let xml = new XMLSerializer().serializeToString(svg);
-    if (transparent) xml = xml.split(' style="background:#fff;"').join('');
-    const svg64 = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(xml)));
-    const img = new Image();
-    img.onload = () => {
-      ctx.drawImage(img, 0, idx * h, w, h);
-      loaded++;
-      if (loaded === svgs.length){
-        canvas.toBlob(blob => {
-          const a = document.createElement("a");
-          a.href = URL.createObjectURL(blob); a.download = filename; a.click();
-        });
-      }
-    };
-    img.src = svg64;
-  });
-}
-
-/* ===== 16:9 汇总图导出 ===== */
 function exportSummary(){
-  const cvSvg = $("cvPlotFull").querySelector("svg");
-  const lsvSvg = $("lsvPlot").querySelector("svg");
-  const hupdSvg = $("cvPlotZoom").querySelector("svg");
-  if (!cvSvg || !lsvSvg || !hupdSvg){ alert("Please generate all plots first (click Calculate ECSA and N₂ Correct &amp; Extract)."); return; }
-  const transparent = $("pngTransparent") && $("pngTransparent").checked;
-  const W = 1920, H = 1080;  // 16:9 for PPT
-  const canvas = document.createElement("canvas");
-  canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext("2d");
-  if (!transparent){ ctx.fillStyle = "#fff"; ctx.fillRect(0,0,W,H); }
-  const margin = 28, gap = 20;
-  const panelW = (W - 2*margin - gap) / 2;
-  const panelH = (H - 2*margin - gap) / 2;
-  const panels = {
-    cv:   {x: margin,                y: margin,                  },
-    lsv:  {x: margin + panelW + gap, y: margin,                  },
-    hupd: {x: margin,                y: margin + panelH + gap,   },
-    res:  {x: margin + panelW + gap, y: margin + panelH + gap, title: "Results Summary"}
-  };
-  const svgs = [
-    {key:"cv",   svg:cvSvg},
-    {key:"lsv",  svg:lsvSvg},
-    {key:"hupd", svg:hupdSvg}
-  ];
-  let loaded = 0;
-  svgs.forEach(({key, svg}) => {
-    let xml = new XMLSerializer().serializeToString(svg);
-    if (transparent) xml = xml.split(' style="background:#fff;"').join('');
-    const svg64 = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(xml)));
-    const img = new Image();
-    img.onload = () => {
-      const p = panels[key];
-      if (!transparent){ ctx.fillStyle = "#fafafa"; ctx.fillRect(p.x, p.y, panelW, panelH); }
-      ctx.strokeStyle = "#d2d2d7"; ctx.lineWidth = 1;
-      ctx.strokeRect(p.x + 0.5, p.y + 0.5, panelW - 1, panelH - 1);
-      // SVG 缩放绘制到面板内（保留少量内边距）
-      const innerW = panelW - 10, innerH = panelH - 10;
-      ctx.drawImage(img, p.x + 5, p.y + 5, innerW, innerH);
-      loaded++;
-      if (loaded === svgs.length){
-        // 绘制结果汇总面板
-        const rp = panels.res;
-        if (!transparent){ ctx.fillStyle = "#fafafa"; ctx.fillRect(rp.x, rp.y, panelW, panelH); }
-        ctx.strokeStyle = "#d2d2d7";
-        ctx.strokeRect(rp.x + 0.5, rp.y + 0.5, panelW - 1, panelH - 1);
-        ctx.fillStyle = "#1d1d1f";
-        ctx.font = "700 24px -apple-system, BlinkMacSystemFont, sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "top";
-        ctx.fillText(rp.title, rp.x + panelW/2, rp.y + 18);
-        // 分隔线
-        ctx.strokeStyle = "#e5e5ea";
-        ctx.beginPath(); ctx.moveTo(rp.x + 24, rp.y + 58); ctx.lineTo(rp.x + panelW - 24, rp.y + 58); ctx.stroke();
-        const items = [
-          ["ECSA", $("o_ecsa").textContent, "m²/gPt"],
-          ["MA",   $("o_ma").textContent,   "A/mgPt"],
-          ["SA",   $("o_sa").textContent,   "mA/cm²"],
-          ["S_H",  $("o_SH").textContent,  "mA·V/cm²"],
-          ["Q_H",  $("o_QH").textContent,  "mC/cm²"],
-          ["j_k",  $("o_jk").textContent,  "mA/cm²"]
-        ];
-        const startY = rp.y + 78;
-        const itemH = 70;
-        const leftX = rp.x + 28, rightX = rp.x + panelW - 28;
-        items.forEach((it, i) => {
-          const yi = startY + i * itemH;
-          const midY = yi + itemH/2;
-          ctx.textBaseline = "middle";
-          ctx.fillStyle = "#6e6e73";
-          ctx.font = "500 22px -apple-system, sans-serif";
-          ctx.textAlign = "left";
-          ctx.fillText(it[0], leftX, midY - 4);
-          ctx.fillStyle = "#1d1d1f";
-          ctx.font = "700 32px -apple-system, sans-serif";
-          ctx.textAlign = "right";
-          ctx.fillText(it[1], rightX, midY - 12);
-          ctx.fillStyle = "#86868b";
-          ctx.font = "400 16px -apple-system, sans-serif";
-          ctx.fillText(it[2], rightX, midY + 16);
-        });
-        canvas.toBlob(blob => {
-          const a = document.createElement("a");
-          a.href = URL.createObjectURL(blob);
-          a.download = "PEMFC_summary.png";
-          a.click();
-        }, "image/png");
-      }
-    };
-    img.src = svg64;
-  });
+  const els=[];
+  for(const [flag,id] of [['exportCv','cvPlotFull'],['exportLsv','lsvPlot'],['exportHupd','cvPlotZoom']])if($(flag).checked)els.push($(id));
+  if($('exportMetrics').checked){
+    const holder=document.createElement('div');
+    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 540 300');
+    const items=[['ECSA',$('o_ecsa').textContent,'m²/gPt'],['MA',$('o_ma').textContent,'A/mgPt'],['SA',$('o_sa').textContent,'mA/cm²Pt'],['S_H',$('o_SH').textContent,'mA·V/cm²'],['Q_H',$('o_QH').textContent,'mC/cm²'],['j_k',$('o_jk').textContent,'mA/cm²']];
+    const add=(value,x,y,size)=>{const t=document.createElementNS(svg.namespaceURI,'text');t.setAttribute('x',x);t.setAttribute('y',y);t.setAttribute('font-size',size);t.setAttribute('fill','#1d1d1f');t.textContent=value;svg.append(t);};
+    add(window.uiT?.('Results Summary','结果汇总')||'Results Summary',24,28,18);
+    items.forEach(([label,value,unit],i)=>add(`${label}: ${value} ${unit}`,24,68+i*36,16));holder.append(svg);els.push(holder);
+  }
+  return exportPNGCombined(els,'PEMFC_selected.png');
 }
 $("summaryPng").addEventListener("click", exportSummary);
-$("cvPng").addEventListener("click", () => exportPNGCombined([$("cvPlotFull"), $("cvPlotZoom")], "CV_with_Hupd.png"));
+$("cvPng").addEventListener("click", () => exportPNGCombined($("exportHupd").checked?[$("cvPlotFull"), $("cvPlotZoom")]:[$("cvPlotFull")], "CV.png"));
 $("lsvPng").addEventListener("click", () => exportPNG($("lsvPlot"), "LSV_ORR.png"));
 
 /* ===== Export CSV ===== */
@@ -2172,8 +2292,309 @@ $("cvBtn").addEventListener("click", calcECSA);
 $("cvText").addEventListener("input", () => { });
 $("loadExample").addEventListener("click", loadExampleData);
 
+function invalidateCv(){
+  ecsaResult=null;
+  lastFullCycle=null;lastAnodicSweep=null;lastCvZoom=null;$('cvPlotFull').replaceChildren();$('cvPlotZoom').replaceChildren();
+  ['o_SH','o_QH','o_ecsa','o_ecsa_cm2','o_rf'].forEach(id=>$(id).textContent='—');calcORR();
+}
+function invalidateLsv(){
+  lsvResult=null;lastLsvX=null;lastLsvY=null;$('lsvPlot').replaceChildren();$('lsvPlot').style.display='none';
+  $('jE').value='';$('jlim').value='';calcORR();
+}
+$('cvText').addEventListener('input',invalidateCv);
+['lsvText','n2Text','o2PotUnit','o2CurUnit','n2CurUnit','area'].forEach(id=>$(id).addEventListener('input',invalidateLsv));
+['Ep','jlimE','jlimMode'].forEach(id=>$(id).addEventListener('input',()=>{if(lsvResult)$('lsvBtn').click();}));
+
 /* Initialize */
 document.querySelector('.frac-tag[data-f="30"]').classList.add("active");
 </script>
+<!-- WORKBENCH SCRIPT START -->
+<script>
+/* Workbench UI: source embedded by build_html.py, no external runtime dependency. */
+(() => {
+  let samples=[],analysis=null,kl=null,selected=new Set();
+  const historyKey='pemfc-sample-history-v1';
+  const inputIds=['cvText','lsvText','n2Text','cvPotUnit','cvCurUnit','o2PotUnit','o2CurUnit','n2CurUnit','vrate','vUnit','qspec','qUnit','area','inkConc','dropVol','ptFrac','hlo','hhi','baselineMode','baseline','Ep','jlimMode','jlimE','wbRef','wbPH','wbRu','wbWidth','wbSlope','wbTafelLo','wbTafelHi'];
+  const T=(en,zh)=>window.uiT?window.uiT(en,zh):en+' · '+zh;
+  function saveHistory(){
+    try{localStorage.setItem(historyKey,JSON.stringify({history_version:1,samples,selected:[...selected]}));$('wbStorage').textContent=T('History saved locally.','历史已保存在本地。');}
+    catch(e){$('wbStorage').textContent=T('Local storage unavailable or full. Back up history JSON now; current samples remain in memory.','本地存储不可用或已满；请立即备份历史 JSON。当前样品仍在内存中。');}
+  }
+  function analyzeSaved(s){
+    if(s.orr)return ECAnalysis.analyzeSample(s);
+    if(!s.cv)throw Error(T('Provide CV or O2 data.','请提供 CV 或 O₂ 数据。'));
+    if(s.loading_mg_cm2!=null&&!(Number.isFinite(s.loading_mg_cm2)&&s.loading_mg_cm2>0))throw Error('Invalid Pt loading');
+    const cv=ECAnalysis.cvAnalysis(s.cv,s.loading_mg_cm2);
+    return {sample_id:s.sample_id,metrics:{ecsa_m2_g:cv.ecsa_m2_g,ehalf_V:null,jlim_mA_cm2:null,ma_0_9V_A_mg:null,sa_0_9V_mA_cm2_Pt:null,tafel_mV_dec:null},qc:{status:'Check recommended',checks:[{code:'cv_only',status:'Check recommended',reason:'CV only; ORR data unavailable',value:null}]},cv,plateau:null,tafel:null,settings:{loading_mg_cm2:s.loading_mg_cm2??null,cv:Object.fromEntries(Object.entries(s.cv).filter(([k])=>!['E','j'].includes(k)))},metadata:s.metadata||{},processed_cv:s.cv.E.map((e,i)=>({sample_id:s.sample_id,point_index:i,potential_V_RHE:e,j_mA_cm2:s.cv.j[i]})),processed_orr:[]};
+  }
+  function selectedAnalysis(){return analysis?{...analysis,samples:analysis.samples.filter(s=>selected.has(s.sample_id))}:null;}
+  function nextName(){let n=1;while(samples.some(s=>s.sample_id===`Sample-${n}`))n++;$('wbName').value=`Sample-${n}`;}
+  function restoreInputs(sample){
+    if(!sample.input_state){$('wbMessage').textContent=T('This imported sample has no original input form; its curves remain available for comparison.','此导入样品没有原始输入表单；仍可参与曲线比较。');return;}
+    $('cvClear').click();$('lsvClear').click();
+    for(const id of inputIds)if(Object.hasOwn(sample.input_state,id))$(id).value=sample.input_state[id];
+    $('wbName').value=sample.sample_id;computePtLoad();
+    if($('cvText').value.trim())calcECSA();if($('lsvText').value.trim())$('lsvBtn').click();
+    $('wbMessage').textContent=T('Inputs restored. Change the name to save a new snapshot.','已恢复输入；如需另存快照，请修改样品名称。');
+  }
+  const colors=['#0071e3','#d70015','#00875a','#8b42bd','#b07800','#007f8b'];
+  const text=(tag,value,parent)=>{const e=document.createElement(tag);e.textContent=value;parent.append(e);return e;};
+  const display=v=>v===null||v===undefined?'—':typeof v==='number'?v.toPrecision(6):String(v);
+  function checkDetail(c){
+    const v=c.value;if(v===null||c.code==='plateau')return '';
+    if(c.code==='cv_stability')return ` Difference: ${(100*v).toFixed(2)}%.`;
+    if(c.code==='transport_0_9V')return ` Ratio: ${(100*v).toFixed(2)}%.`;
+    if(c.code==='plateau_sensitivity')return ` jlim change: ${v.jlim_relative===null?'unavailable':(100*v.jlim_relative).toFixed(2)+'%'}; MA change: ${v.ma_relative===null?'unavailable':(100*v.ma_relative).toFixed(2)+'%'}${v.singular?'; singular correction encountered':''}.`;
+    if(c.code==='tafel')return ` ${display(v.slope_mV_dec)} mV/dec; R² ${display(v.r2)}; ${v.count} points.`;
+    return '';
+  }
+  function download(name,content){const url=URL.createObjectURL(new Blob([content],{type:name.endsWith('.json')?'application/json':'text/csv;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+  function snapshot(){
+    const area=num('area'),loading=computePtLoad()/1000,ref=$('wbRef').value,pH=num('wbPH'),ru=num('wbRu');
+    if(!(area>0)||!Number.isFinite(pH)||!(ru>=0))throw Error('Check area, pH and Ru');
+    const offsets={RHE:0,SHE:0,AgAgCl_satKCl:0.197,AgAgCl_3M:0.210,SCE:0.241,MSE:0.640};
+    const shift=ref==='RHE'?0:offsets[ref]+8.314462618*298.15/96485.33212*2.302585093*pH;
+    const read=(id,pot,cur)=>{const rows=parse2col($(id).value,$(pot).value,$(cur).value);return {E:rows.map(r=>r[0]+shift-r[1]*ru),j:rows.map(r=>r[1]*1000/area)};};
+    const s={sample_id:$('wbName').value.trim(),loading_mg_cm2:loading,orr:read('lsvText','o2PotUnit','o2CurUnit'),
+      qc_options:{min_width_V:num('wbWidth'),slope_fraction_per_V:num('wbSlope')},tafel_range_V:[num('wbTafelLo'),num('wbTafelHi')],
+      metadata:{source:'browser_capture',reference:ref,pH,temperature_K:298.15,additional_Ru_ohm:ru,area_cm2:area}};
+    if(!$('lsvText').value.trim())delete s.orr;
+    if(s.orr&&$('n2Text').value.trim()){
+      let n=read('n2Text','o2PotUnit','n2CurUnit');
+      // Preserve the original N2 full-CV workflow by selecting the last forward branch.
+      if(!n.E.slice(1).every((v,i)=>v>n.E[i])&&!n.E.slice(1).every((v,i)=>v<n.E[i])){
+        const branches=ECAnalysis.sweeps(n.E,n.j).filter(([x])=>x.at(-1)>x[0]);
+        if(!branches.length)throw Error('No forward N2 sweep');const [E,j]=branches.at(-1);n={E,j};s.metadata.n2_selection='last_anodic_sweep';
+      }
+      const [nx,ny]=ECAnalysis.curve(n.E,n.j);s.n2={E:nx,j:ny};
+      const keep=s.orr.E.map((e,i)=>({e,j:s.orr.j[i]})).filter(p=>p.e>=nx[0]&&p.e<=nx.at(-1));
+      s.metadata.o2_points_outside_n2=s.orr.E.length-keep.length;
+      s.orr={E:keep.map(p=>p.e),j:keep.map(p=>p.j)};
+      if(s.orr.E.length<2)throw Error('N2 does not cover the O2 sweep');
+
+    }
+    if($('cvText').value.trim()){
+      s.cv={...read('cvText','cvPotUnit','cvCurUnit'),scan_rate_V_s:scanRateV(),q_mC_cm2:qspecCmC(),hupd_range_V:[num('hlo'),num('hhi')]};
+      if($('baselineMode').value==='manual'){if(!Number.isFinite(num('baseline')))throw Error('Enter a finite manual baseline / 请填写有效手动基线');s.cv.baseline_mA_cm2=num('baseline');}
+    }s.input_state=Object.fromEntries(inputIds.map(id=>[id,$(id).value]));s.saved_at=new Date().toISOString();return s;
+  }
+  function render(){
+    $('wbTable').replaceChildren();$('wbQC').replaceChildren();$('wbLegend').replaceChildren();$('wbDownloads').replaceChildren();
+    for(const id of ['wbCvPlot','wbOrrPlot'])$(id).replaceChildren();
+    if(!analysis)return;
+    const head=text('tr','',$('wbTable'));
+    ['Compare · 比较','Sample','ECSA (m²/gPt)','E1/2 (V)','jlim (mA/cm²)','MA@0.9V (A/mgPt)','SA@0.9V (mA/cm²Pt)','Tafel (mV/dec)','QC','Actions · 操作'].forEach(v=>text('th',v,head));
+    analysis.samples.forEach((s,i)=>{
+      const row=text('tr','',$('wbTable')),pick=document.createElement('input');pick.type='checkbox';pick.style.width='auto';pick.checked=selected.has(s.sample_id);pick.setAttribute('aria-label','Compare '+s.sample_id);
+      pick.onchange=()=>{if(pick.checked)selected.add(s.sample_id);else selected.delete(s.sample_id);saveHistory();render();};text('td','',row).append(pick);
+      const nameCell=text('td','',row),name=document.createElement('input');name.value=s.sample_id;name.maxLength=80;name.style.minWidth='140px';name.setAttribute('aria-label','Sample name '+s.sample_id);nameCell.append(name);
+      const rename=text('button',T('Rename','重命名'),nameCell);rename.className='btn btn-secondary';rename.onclick=guarded(()=>{
+        const value=name.value.trim();
+        const next=samples.map(t=>t.sample_id===s.sample_id?{...t,sample_id:value}:t);
+        commit(next,new Set([...selected].map(id=>id===s.sample_id?value:id)));
+      });
+      [...ECAnalysis.resultFields.slice(1,-1).map(k=>s.metrics[k]),s.qc.status].forEach(v=>text('td',display(v),row));
+      const actions=text('td','',row),restore=text('button',T('Restore inputs','恢复输入'),actions);restore.className='btn btn-secondary';restore.onclick=()=>restoreInputs(samples[i]);restore.disabled=!samples[i].input_state;
+      const remove=text('button','Remove',actions);remove.className='btn btn-secondary';remove.onclick=guarded(()=>commit(samples.filter(t=>t.sample_id!==s.sample_id)));
+      if(!selected.has(s.sample_id))return;
+      const detail=text('details','',$('wbQC'));text('summary',`${s.sample_id} — ${s.qc.status}`,detail);
+      if(s.plateau)text('p',`Plateau: ${display(s.plateau.start_V)}–${display(s.plateau.end_V)} V; median ${display(s.plateau.jlim_mA_cm2)}; MAD ${display(s.plateau.mad_mA_cm2)}; SD ${display(s.plateau.std_mA_cm2)} mA/cm²`,detail);
+      if(s.metadata?.o2_points_outside_n2)text('p',`${s.metadata.o2_points_outside_n2} O2 endpoint(s) outside N2 coverage omitted · 已省略 N₂ 范围外的 O₂ 端点。`,detail);
+      const list=text('ul','',detail);s.qc.checks.forEach(c=>text('li',`${c.status}: ${c.reason}${checkDetail(c)}`,list));
+    });
+    for(const [id,key,jkey,title] of [['wbCvPlot','processed_cv','j_mA_cm2','CV comparison'],['wbOrrPlot','processed_orr','j_corrected_mA_cm2','ORR comparison']]){
+      const series=analysis.samples.map((s,i)=>({name:s.sample_id,x:s[key].filter(r=>Number.isFinite(r[jkey])).map(r=>r.potential_V_RHE),y:s[key].filter(r=>Number.isFinite(r[jkey])).map(r=>r[jkey]),color:colors[i%colors.length]})).filter(s=>selected.has(s.name)&&s.x.length);
+      if(series.length)svgChart($(id),series,{title,xlabel:'E (V vs RHE)',ylabel:'j (mA/cm²)'});
+    }
+    for(const name of ['analysis.json','results.csv','processed_cv.csv','processed_orr.csv','summary.csv']){
+      const b=text('button',`Download ${name}`,$('wbDownloads'));b.className='btn btn-secondary';b.disabled=!selected.size;b.onclick=()=>download(name,ECAnalysis.exports({...selectedAnalysis(),...(kl?{kl}:{})})[name]);
+    }
+  }
+  function commit(next,selection=null,persist=true){
+    const ids=next.map(s=>s?.sample_id);
+    if(ids.some(id=>typeof id!=='string'||!id.trim()||id.length>80)||new Set(ids).size!==ids.length)throw Error(T('Use unique, nonempty sample names (up to 80 characters).','样品名称不能为空、不能重复，最多 80 字符。'));
+    const result=next.length?{schema_version:'1.0.0',units:{potential:'V vs RHE',current_density:'mA/cm2',loading:'mgPt/cm2'},samples:next.map(analyzeSaved)}:null;
+    const previous=new Set(samples.map(s=>s.sample_id));
+    selected=selection||new Set(ids.filter(id=>selected.has(id)||!previous.has(id)));
+    selected=new Set([...selected].filter(id=>ids.includes(id)));
+    samples=next;analysis=result;render();if(persist)saveHistory();$('wbMessage').textContent=`${samples.length} sample(s) analyzed. Results are snapshots.`;
+  }
+  function guarded(fn){return async()=>{try{await fn();}catch(e){$('wbMessage').textContent=e.message;}};}
+  $('wbCapture').onclick=guarded(()=>{commit([...samples,snapshot()]);nextName();});
+  $('wbClear').onclick=()=>{if(confirm(T('Clear all saved samples? Back up history first.','清空全部历史样品？请先备份历史。')))commit([]);};
+  $('wbSelectAll').onclick=()=>{selected=new Set(samples.map(s=>s.sample_id));saveHistory();render();};
+  $('wbSelectNone').onclick=()=>{selected.clear();saveHistory();render();};
+  $('wbBackup').onclick=()=>download('sample_history.json',JSON.stringify({history_version:1,samples,selected:[...selected]},null,2));
+  $('wbFiles').onchange=guarded(async()=>{
+    try {
+      const added=[];
+      for(const f of $('wbFiles').files){
+        const p=JSON.parse(await f.text()),items=p.samples||[p];if(!Array.isArray(items))throw Error('Invalid samples JSON');
+        for(const item of items){
+          if(item?.qc?.checks?.some(c=>c.code==='n2_background'&&c.status==='Invalid'))throw Error('Invalid N2 analysis cannot be reconstructed; import the raw history backup / N₂ 无效分析无法重建，请导入原始历史备份');
+          let raw=item;
+          // Reimport analysis.json as well as raw history; retain original raw O2/N2 when present.
+          if(!item.orr&&Array.isArray(item.processed_orr)){
+            raw={sample_id:item.sample_id,loading_mg_cm2:item.settings?.loading_mg_cm2??null,metadata:item.metadata||{}};
+            if(item.processed_orr.length){raw.orr={E:item.processed_orr.map(r=>r.potential_V_RHE),j:item.processed_orr.map(r=>r.j_raw_mA_cm2)};
+              if(item.processed_orr.every(r=>Number.isFinite(r.j_background_mA_cm2)))raw.n2={E:raw.orr.E,j:item.processed_orr.map(r=>r.j_background_mA_cm2)};}
+            if(item.processed_cv?.length)raw.cv={...item.settings?.cv,E:item.processed_cv.map(r=>r.potential_V_RHE),j:item.processed_cv.map(r=>r.j_mA_cm2)};
+            raw.qc_options=item.settings?.qc_options;raw.tafel_range_V=item.settings?.tafel_range_V;
+          }
+          const original=String(raw.sample_id||'Imported').slice(0,70);let name=original,n=2;
+          while([...samples,...added].some(s=>s.sample_id===name))name=`${original} (${n++})`;
+          added.push({...raw,sample_id:name});
+        }
+      }
+      commit([...samples,...added]);nextName();
+    }finally{$('wbFiles').value='';}
+  });
+  $('wbPlotDownload').onclick=()=>{
+    const els=[];if($('wbExportCv').checked)els.push($('wbCvPlot'));if($('wbExportLsv').checked)els.push($('wbOrrPlot'));
+    exportPNGCombined(els,'comparison.png');
+  };
+  function demoSample(id,center){
+    const E=Array.from({length:201},(_,i)=>0.2+i*0.004),j=E.map(e=>-6/(1+Math.exp((e-center)/0.025)));
+    const ce=[],cj=[];for(let cycle=0;cycle<3;cycle++){for(let i=0;i<100;i++){const e=i/100;ce.push(e);cj.push(0.08+0.7*Math.exp(-(((e-0.18)/0.07)**2)));}for(let i=100;i>0;i--){ce.push(i/100);cj.push(-0.08);}}ce.push(0);cj.push(0.08);
+    return {sample_id:id,orr:{E,j},n2:{E,j:E.map(()=>0)},cv:{E:ce,j:cj,scan_rate_V_s:0.02},loading_mg_cm2:0.02,metadata:{synthetic:true}};
+  }
+  $('wbDemo').onclick=guarded(()=>{let suffix=1;while(samples.some(s=>s.sample_id===`Demo-Pt-${suffix}`||s.sample_id===`Demo-PtCo-${suffix}`))suffix++;commit([...samples,demoSample(`Demo-Pt-${suffix}`,0.85),demoSample(`Demo-PtCo-${suffix}`,0.87)]);});
+  try{
+    const saved=JSON.parse(localStorage.getItem(historyKey)||'null');
+    if(saved){if(saved.history_version!==1||!Array.isArray(saved.samples))throw Error('Unsupported history');commit(saved.samples,new Set(saved.selected||saved.samples.map(s=>s.sample_id)),false);nextName();}
+  }catch(e){$('wbStorage').textContent=T('Could not restore local history; import your backup JSON. Existing storage has not been overwritten.','无法恢复本地历史；请导入 JSON 备份。原存储尚未覆盖。');}
+
+  function parseKL(input){
+    const groups=new Map();
+    for(const [index,line] of input.trim().split(/\r?\n/).entries()){
+      if(!line.trim()||/^rpm[,\s]/i.test(line.trim()))continue;
+      const values=line.trim().split(/[,\s]+/).map(Number);if(values.length!==3||!values.every(Number.isFinite))throw Error(`Invalid K-L CSV row ${index+1}`);
+      const [rpm,e,j]=values;if(!groups.has(rpm))groups.set(rpm,{rpm,E:[],j:[]});groups.get(rpm).E.push(e);groups.get(rpm).j.push(j);
+    }return [...groups.values()];
+  }
+  function invalidateKL(){kl=null;$('klPlot').replaceChildren();$('klResult').textContent='Inputs changed. Run Fit K–L to refresh results.';}
+  ['klText','klE','klD','klNu','klC'].forEach(id=>$(id).addEventListener('input',invalidateKL));
+  $('klFiles').onchange=async()=>{try{const rows=[];for(const f of $('klFiles').files)rows.push(await f.text());$('klText').value=rows.join('\n');invalidateKL();}catch(e){$('klResult').textContent=e.message;}};
+  $('klRun').onclick=()=>{
+    invalidateKL();try{const optional=id=>$(id).value.trim()?num(id):null;kl=ECAnalysis.klFit(parseKL($('klText').value),num('klE'),optional('klD'),optional('klNu'),optional('klC'));
+      $('klResult').textContent=`${kl.status}\nslope: ${display(kl.slope)} (cm²/mA)(rad/s)^½\nintercept: ${display(kl.intercept)} cm²/mA\nR²: ${display(kl.r2)}\njk: ${display(kl.jk_mA_cm2)} mA/cm² (signed)\nn: ${display(kl.n)}\n${kl.reasons.join('\n')}`;
+      const x=[...kl.omega_inv_sqrt].sort((a,b)=>a-b);svgChart($('klPlot'),[{x:kl.omega_inv_sqrt,y:kl.inverse_j,color:'#0071e3'},{x,y:x.map(v=>kl.slope*v+kl.intercept),color:'#d70015',dashed:true}],{title:'Koutecky–Levich fit',xlabel:'omega^(-1/2) (rad/s)^(-1/2)',ylabel:'1/j (cm²/mA)'});
+    }catch(e){$('klResult').textContent=e.message;}
+  };
+  $('klDemo').onclick=()=>{const lines=['rpm,potential_V_RHE,j_mA_cm2'];for(const rpm of [400,900,1600,2500])for(const e of [0.895,0.9,0.905]){const jl=1000*0.620*4*96485.33212*(1.9e-5)**(2/3)*0.01**(-1/6)*1.2e-6*Math.sqrt(2*Math.PI*rpm/60);lines.push([rpm,e,-1/(1/10+1/jl)].join(','));}$('klText').value=lines.join('\n');$('klD').value='0.000019';$('klNu').value='0.01';$('klC').value='0.0000012';$('klE').value='0.9';$('klRun').click();};
+  $('klDownload').onclick=()=>{if(kl)download('kl_analysis.json',JSON.stringify({schema_version:'1.0.0',kl},null,2));};
+})();
+
+</script>
+<!-- WORKBENCH SCRIPT END -->
+<!-- I18N SCRIPT START -->
+<script>
+/* Offline bilingual UI layer. English source text remains canonical; switch is reversible. */
+(() => {
+  const exact = new Map([
+    ['Test Standard','测试标准'],
+    ['Electrochemical Surface Area (ECSA · Hupd Method)','电化学活性表面积（ECSA · Hupd 法）'],
+    ['Scan Rate','扫描速率'],['Pt Monolayer Charge q','Pt 单层氢吸附电荷 q'],['RDE Geometric Area (cm²)','RDE 几何面积 (cm²)'],
+    ['Ink Concentration (mg/mL)','墨水浓度 (mg/mL)'],['Drop Volume (µL)','滴涂体积 (µL)'],['Pt Weight Fraction (%)','Pt 质量分数 (%)'],['→ Pt Loading (µg/cm²)','→ Pt 载量 (µg/cm²)'],
+    ['Advanced Integration Settings','高级积分设置'],['Hupd Lower Limit (V)','Hupd 下限 (V)'],['Hupd Upper Limit (V)','Hupd 上限 (V)'],
+    ['Baseline Subtraction Mode','基线扣除方式'],['Origin-style · End-plateau horizontal baseline','Origin 风格 · 末端平台水平基线'],['Manual horizontal baseline','手动水平基线'],
+    ['Manual Baseline Current Density (mA/cm²)','手动基线电流密度 (mA/cm²)'],['Manual mode only','仅手动模式'],
+    ['Potential','电位'],['Current','电流'],['CV Data (two columns: potential, current; space/comma/tab separated)','CV 数据（两列：电位、电流；空格/逗号/Tab 分隔）'],
+    ['Calculate ECSA','计算 ECSA'],['Download CV Plot','下载 CV 图'],['Clear CV','清空 CV'],['Load Example Data','载入示例数据'],
+    ['PNG transparent background (applies to CV & LSV exports)','PNG 透明背景（适用于 CV 与 LSV 导出）'],['Hupd plot X-axis range (V):','Hupd 图 X 轴范围 (V)：'],['Min','最小'],['Max','最大'],['Apply X-axis','应用 X 轴'],
+    ['ORR Mass Activity / Specific Activity','ORR 质量活性 / 比活性'],['Current Density j @ E (mA/cm²)','指定电位下电流密度 j (mA/cm²)'],['Evaluation Potential E (V vs RHE)','评价电位 E (V vs RHE)'],
+    ['Auto diffusion plateau (recommended)','自动扩散平台（推荐）'],['Manual potential (legacy)','手动电位（兼容模式）'],['Evaluation Potential (V)','评价电位 (V)'],
+    ['Correct & Extract','校正并提取'],['Download LSV Plot','下载 LSV 图'],['Clear LSV','清空 LSV'],['Y-axis range (mA/cm²):','Y 轴范围 (mA/cm²)：'],['Apply Y-axis','应用 Y 轴'],
+    ['Results Summary','结果汇总'],['Export CSV','导出 CSV'],['Export Summary (16:9)','导出汇总图 (16:9)'],
+    ['Analysis Workbench · 自动 QC / 多样品比较','分析工作台 · 自动 QC / 多样品比较'],['Sample ID','样品 ID'],['Input potential reference','输入电位参比'],
+    ['Additional uncompensated Ru (Ω)','附加未补偿 Ru (Ω)'],['Minimum plateau width (V)','最小平台宽度 (V)'],['Plateau slope / amplitude (V⁻¹)','平台斜率 / 幅值 (V⁻¹)'],
+    ['Tafel lower bound (V RHE)','Tafel 下限 (V RHE)'],['Tafel upper bound (V RHE)','Tafel 上限 (V RHE)'],['Analyze & add current sample','分析并加入当前样品'],
+    ['Load two-sample demo','载入双样品示例'],['Clear comparison','清空比较'],['Import one or more sample JSON files (see README schema)','导入一个或多个样品 JSON 文件（见 README schema）'],
+    ['Download comparison plots','下载比较图'],['Multi-rpm Koutecký–Levich · 多转速拟合','多转速 Koutecký–Levich 拟合'],
+    ['Import one or more multi-rpm CSV files','导入一个或多个多转速 CSV 文件'],['Fit potential (V RHE)','拟合电位 (V RHE)'],['O₂ diffusion D (cm²/s), optional','O₂ 扩散系数 D (cm²/s，可选)'],
+    ['Kinematic viscosity ν (cm²/s)','运动黏度 ν (cm²/s)'],['O₂ concentration C (mol/cm³)','O₂ 浓度 C (mol/cm³)'],['Fit K–L','拟合 K–L'],['Load K–L demo','载入 K–L 示例'],['Download K–L JSON','下载 K–L JSON'],
+    ['Sample','样品'],['Remove','移除'],['CV comparison','CV 比较'],['ORR comparison','ORR 比较'],['Koutecky–Levich fit','Koutecký–Levich 拟合'],
+    ['LSV Data (O','LSV 数据 (O'],['Background)','背景)'],['Manual j','手动 j'],['Limiting Current j','极限电流 j'],['Manual jlim Evaluation Potential (V)','手动极限电流评价电位 (V)'],
+    ['Good','良好'],['Check recommended','建议检查'],['Invalid','无效']
+  ]);
+  exact.set("Figure contents · 导出图内容","导出图内容");
+  exact.set("Hupd integration panel · 积分区间图","积分区间图");
+  exact.set("Results table · 数据汇总","数据汇总");
+  exact.set("Shading and markers · 阴影与标记","阴影与标记");
+  exact.set("Layout · 排版","排版");
+  exact.set("Compact · 紧凑排列","紧凑排列");
+  exact.set("16:9 · 演示文稿","演示文稿");
+  exact.set("Select only the panels you need. Shading and markers affect PNG exports, not calculations. · 仅导出勾选内容；阴影与标记选项仅影响图片，不改变计算。","仅导出勾选内容；阴影与标记选项仅影响图片，不改变计算。");
+  exact.set("Export selected figure · 导出所选图","导出所选图");
+  exact.set("Analysis Workbench · 自动 QC / 多样品比较","自动 QC / 多样品比较");
+  exact.set("Sample name · 样品名称","样品名称");
+  exact.set("History is saved in this browser. Back up JSON before moving the HTML or clearing browser data. · 历史保存在当前浏览器；移动 HTML 或清理浏览器前请备份 JSON。","历史保存在当前浏览器；移动 HTML 或清理浏览器前请备份 JSON。");
+  exact.set("Back up history · 备份历史","备份历史");
+  exact.set("Select all · 全选","全选");
+  exact.set("Select none · 全不选","全不选");
+  exact.set("CV comparison · CV 比较","CV 比较");
+  exact.set("LSV comparison · LSV 比较","LSV 比较");
+  exact.set("Checked samples appear in plots and analysis exports; history backup includes all samples. · 勾选样品用于绘图和分析导出；历史备份包含全部样品。","勾选样品用于绘图和分析导出；历史备份包含全部样品。");
+  exact.set("Multi-rpm Koutecký–Levich · 多转速拟合","多转速拟合");
+  const phrases = [
+    ['Hupd background subtraction · ECSA · ORR mass/specific activity · Offline calculation','Hupd 背景扣除 · ECSA · ORR 质量/比活性 · 离线计算'],
+    ['Based on GB/T 20042.4-2025. Methods are compatible with US DOE and EU JRC/IEC protocols (Hupd ECSA, K-L kinetic current, q = 0.21 mC/cm²).','基于 GB/T 20042.4-2025；方法兼容美国 DOE 与欧盟 JRC/IEC 常用流程（Hupd ECSA、K-L 动力学电流，q = 0.21 mC/cm²）。'],
+    ['Capture the current CV/O₂/N₂ inputs, or import sample JSON files. Each capture is a snapshot; recapture after changing inputs. Analysis uses cathodic currents and a continuous diffusion plateau. Missing results are shown as —.','可捕获当前 CV/O₂/N₂ 输入，或导入样品 JSON。每次捕获都是快照，修改输入后需重新捕获。分析采用阴极电流与连续扩散平台；缺失结果显示为 —。'],
+    ['RHE conversion and E − I·Ru apply only to captured workbench data. Use Ru = 0 if already corrected. Hupd bounds above are interpreted in V vs RHE here. Original manual calculators remain available.','RHE 换算与 E − I·Ru 仅作用于工作台捕获的数据；若数据已校正，请设 Ru = 0。此处 Hupd 范围按 V vs RHE 解释；原手动计算器仍保留。'],
+    ['Paste/import CSV: rpm,potential_V_RHE,j_mA_cm2. Supply a single corrected ORR sweep per rpm, at least three distinct speeds. Values must already be in V vs RHE and mA/cm²; no background or potential correction is applied here.','粘贴/导入 CSV：rpm,potential_V_RHE,j_mA_cm2。每个转速提供一条已校正 ORR 扫描，至少三个不同转速。数据必须已为 V vs RHE 与 mA/cm²；此处不再做背景或电位校正。'],
+    ['Continuous low-derivative cathodic plateau detected','检测到连续低导数阴极扩散平台'],['No resolved diffusion plateau; no min(j) fallback','未识别可靠扩散平台；不使用 min(j) 回退'],
+    ['N2 background subtracted','已扣除 N₂ 背景'],['N2 background unavailable; ORR remains uncorrected','N₂ 背景不可用；ORR 保持未校正'],
+    ['Last two comparable anodic sweeps RMS difference','最后两条可比阳极扫描的 RMS 差异'],['At least two complete anodic sweeps required','至少需要两条完整阳极扫描'],
+    ['Half-plateau rising crossing','半平台上升支交点'],['Half-wave crossing not resolved','未识别半波电位交点'],
+    ['MA requires Pt loading; SA requires positive Hupd ECSA','MA 需要 Pt 载量；SA 需要有效的正值 Hupd ECSA'],
+    ['Kinetic-current Tafel fit; >=5 points and >=0.3 decades required','动力学电流 Tafel 拟合；要求 ≥5 个点且跨度 ≥0.3 decade'],
+    ['Plateau standard deviation exceeds 5% of |jlim|','平台标准差超过 |jlim| 的 5%'],
+    ['Inputs changed. Run Fit K–L to refresh results.','输入已变化，请重新执行 K–L 拟合。']
+  ];
+  const originals=new WeakMap();
+  let savedLang=null;try{savedLang=localStorage.getItem('pemfc-ui-lang');}catch(e){}
+  let lang=savedLang||((navigator.language||'').toLowerCase().startsWith('zh')?'zh':'en');
+  let applying=false;
+  function zhText(s){
+    if(exact.has(s)) return exact.get(s);
+    let out=s;
+    for(const [en,zh] of phrases) out=out.split(en).join(zh);
+    out=out.replace(/^Download (.+)$/,'下载 $1')
+      .replace(/^(\d+) sample\(s\) analyzed\. Results are snapshots\.$/,'已分析 $1 个样品；结果为当前快照。')
+      .replace(/^Plateau:/,'平台：').replace(/; median /g,'；中位数 ').replace(/; MAD /g,'；MAD ').replace(/; SD /g,'；SD ')
+      .replace(/^Difference:/,'差异：').replace(/^Ratio:/,'比例：').replace(/ points\.$/,' 个点。');
+    return out;
+  }
+  function translateNode(n){
+    if(!originals.has(n)) originals.set(n,n.nodeValue);
+    const src=originals.get(n);
+    n.nodeValue=lang==='zh'?zhText(src):src;
+  }
+  function apply(root=document.body){
+    if(applying||!root)return; applying=true;
+    const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
+    let n; while((n=walker.nextNode())){
+      const tag=n.parentElement?.tagName;
+      if(tag==='SCRIPT'||tag==='STYLE'||tag==='TEXTAREA'||n.parentElement?.closest('[data-i18n-skip]'))continue;
+      if(n.nodeValue.trim()) translateNode(n);
+    }
+    document.documentElement.lang=lang==='zh'?'zh-CN':'en';
+    const b=document.getElementById('langToggle'); if(b)b.textContent=lang==='zh'?'EN':'中文';
+    applying=false;
+  }
+  function toggle(){lang=lang==='zh'?'en':'zh';try{localStorage.setItem('pemfc-ui-lang',lang);}catch(e){}apply();}
+  window.uiLang=()=>lang;
+  window.uiT=(en,zh)=>lang==='zh'?zh:en;
+  const header=document.querySelector('header');
+  if(header){
+    header.style.position='relative';
+    const b=document.createElement('button');b.id='langToggle';b.className='btn btn-secondary';b.type='button';b.style.cssText='position:absolute;right:0;top:0;min-width:64px';b.addEventListener('click',toggle);header.appendChild(b);
+  }
+  new MutationObserver(ms=>{if(applying)return;for(const m of ms)for(const n of m.addedNodes){if(n.nodeType===Node.TEXT_NODE&&n.nodeValue.trim())translateNode(n);else if(n.nodeType===Node.ELEMENT_NODE)apply(n);}}).observe(document.body,{subtree:true,childList:true});
+  apply();
+})();
+
+</script>
+<!-- I18N SCRIPT END -->
 </body>
 </html>
