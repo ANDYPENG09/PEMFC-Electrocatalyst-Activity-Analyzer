@@ -1,7 +1,7 @@
 {
   "name": "pemfc-electrocatalyst-analyzer-tests",
   "private": true,
-  "version": "1.2.1",
+  "version": "1.2.2",
   "scripts": {"test": "node tests/test_core.cjs && node tests/test_ui.cjs"},
   "devDependencies": {"jsdom": "30.1.1"}
 }

@@ -1,229 +1,56 @@
 # PEMFC Electrocatalyst Activity Analyzer
 
-A self-contained, offline electrochemistry calculator for **PEM fuel cell catalyst characterization** — compute ECSA (H-upd), mass activity (MA), and specific activity (SA) from cyclic voltammetry (CV) and linear sweep voltammetry (LSV) data, directly in your browser with zero dependencies.
+Offline **CV / ORR analysis** for catalyst R&D: ECSA, mass activity, specific activity, QC, multi-sample comparisons and multi-rpm Koutecký–Levich fitting.
 
-![Apple-style UI](https://img.shields.io/badge/UI-Apple%20HIG-blue) ![Offline](https://img.shields.io/badge/Offline-100%25-brightgreen) ![License](https://img.shields.io/badge/License-MIT-yellow)
+**[Open the workbench](https://andypeng09.github.io/PEMFC-Electrocatalyst-Activity-Analyzer/)** · **[Download current HTML](https://raw.githubusercontent.com/ANDYPENG09/PEMFC-Electrocatalyst-Activity-Analyzer/main/index.html)** · [Releases](https://github.com/ANDYPENG09/PEMFC-Electrocatalyst-Activity-Analyzer/releases) · [Methods and export schema](docs/methods-and-exports.md)
 
-## Features
+Current source: **v1.2.2**. One self-contained `index.html`, English / 中文, no installation or data upload. Download/save the HTML to use offline; a raw download link may display source text in your browser.
 
-- **ECSA via H-upd method** — Integrates the hydrogen underpotential deposition (H-upd) desorption peak from forward-scan CV, with automatic baseline subtraction (end-point horizontal baseline, compatible with Origin).
-- **ORR mass / specific activity** — Paste O₂ and N₂ LSV curves; auto N₂ background correction, Savitzky-Golay smoothing, kinetic current via Koutecký–Levich equation.
-- **Full CV cycle export** — Plots show the complete anodic + cathodic sweep; H-upd integration region highlighted; baseline and peak area clearly visualized.
-- **Three-standard compatibility** — Based on GB/T 20042.4-2025, methods compatible with US DOE and EU JRC/IEC protocols (q = 0.21 mC/cm²).
-- **Ink-concentration loading** — Catalyst loading auto-calculated from ink concentration (mg/mL), drop volume (µL), RDE area, and Pt weight fraction (30%/50% preset buttons).
-- **Analysis workbench** — Automatic diffusion plateau, explained QC, multi-rpm K–L fitting, multi-sample comparison and versioned JSON/CSV exports in the same offline page and Python core.
-- **Bilingual offline UI** — Switch the standalone HTML between English and Chinese without reloading or internet access.
-- **Final summary CSV** — `summary.csv` combines sample metrics with the exact CV and corrected LSV points used for plotting.
-- **Pure frontend** — Single HTML file, no server, no build step, no internet required. Works offline.
+![Synthetic two-sample comparison](docs/example-comparison.svg)
 
-## Quick Start
+*Illustration uses synthetic curves, not experimental performance claims.*
 
-1. Open `index.html` in any modern browser. The file includes its scripts and works directly from disk, without a server or internet.
-2. Click **Load Example Data** to see a pre-filled demo (EC-30-PtCo sample).
-3. Or paste your own CV data (potential V, current A) into the CV textarea.
-4. Click **Calculate ECSA** → results appear instantly with SVG charts.
+## Start in one minute
 
-## Formulas
+1. Open the workbench or save and open `index.html` locally.
+2. Click **Load Example Data** for the original calculators, or **Load two-sample demo** in the Analysis Workbench.
+3. For your data, fill CV and O₂/N₂ LSV, confirm current units, scan rate, Pt loading and potential reference. Give each sample a unique name and click **Analyze & add current sample**.
+4. Select samples to compare. Inspect QC explanations before interpreting metrics; choose which CV/LSV panels to export.
+5. Download results/curve points with `summary.csv`, analysis with JSON, and raw samples/settings with **Back up history**.
 
-### ECSA (H-upd)
+History is stored in the current browser. JSON backup is the portable copy to keep before moving the HTML, changing browsers or clearing storage.
 
-$$
-\text{ECSA} = \frac{100 \cdot S_H}{q \cdot v \cdot m_{\text{Pt}}}
-$$
+## What it includes
 
-| Symbol | Meaning | Default |
-|--------|---------|---------|
-| $S_H$ | H-upd desorption peak area (mA·V/cm²) | Auto from CV |
-| $q$ | H-upd charge constant | 0.21 mC/cm² |
-| $v$ | Scan rate (V/s) | 0.02 (20 mV/s) |
-| $m_{\text{Pt}}$ | Pt loading (µg/cm²) | From ink params |
-
-### Mass Activity (MA)
-
-$$
-j_k = \frac{|j| \cdot |j_{\text{lim}}|}{|j_{\text{lim}}| - |j|}, \quad
-\text{MA} = \frac{j_k}{1000 \cdot m_{\text{Pt, mg}}}
-$$
-
-### Specific Activity (SA)
-
-$$
-\text{SA} = \frac{j_k}{\text{ECSA}_{\text{m²/g}} \cdot m_{\text{Pt, g/cm²}} \cdot 10^4}
-$$
-
-## Data Format
-
-Two-column tab/space/comma-separated text:
-
-```
-Potential(V)  Current(A)
-0.05          -4.4185E-5
-0.10           2.8e-5
-...
-```
-
-- **CV**: Forward + reverse sweep (full cycle). The calculator auto-detects the anodic sweep and selects the H-upd region [0.05, 0.40] V.
-- **LSV**: Paste O₂ curve and N₂ background separately; N₂ is interpolated and subtracted automatically.
-
-## File Structure
-
-```
-PEMFC-Electrocatalyst-Activity-Analyzer/
-├── README.md                          # This file
-├── LICENSE                            # MIT License
-├── index.html                        # Standalone offline calculator + workbench
-├── electrochem_analysis.py           # QC, plateau, K-L, batch, exports, CLI
-├── web/                              # Maintained JS/HTML workbench sources
-├── build_html.py                     # Embed sources into index.html (developers only)
-├── tests/                            # Numerical, legacy, export and JS/Python parity tests
-├── electrochem_calc.py                # Python helper (formula functions)
-├── electrochem_plot.py                # Python matplotlib plotting
-├── read_paax.py                       # Autolab .paax parser
-├── extract_origin.py                  # Origin .opju extractor
-└── run_example.py                     # Demo runner
-```
-
-## New workbench (HTML and Python)
-
-The original manual ECSA, MA/SA, loading, smoothing, plot/PNG/CSV controls and Python formula/plot/PAAX/Origin utilities remain available. Automatic LSV extraction now defaults to a **continuous plateau median**, with an explicit **Manual potential (legacy)** selector retained. `half_wave_potential(E, j)` keeps its two-argument API, uses the detected plateau, and returns `nan` when no reliable plateau/crossing exists. An optional third `j_lim` argument permits an explicit value. No automatic path substitutes `min(j)`.
-
-### Browser workflow
-
-1. Fill the original CV/O₂/N₂ text areas and units/loading settings.
-2. In **Analysis Workbench**, enter a unique sample ID and choose the input potential reference, pH and additional uncompensated Ru. Click **Analyze & add current sample**. RHE inputs receive no pH shift; other references use the 25 °C Nernst term. The correction is `E_RHE − I_A * Ru`. Leave Ru at zero for already corrected curves.
-3. Repeat with another sample, or select multiple input JSON files. Each file may contain one sample object or `{ "samples": [...] }`. Captures are independent snapshots; remove and recapture a sample to update it. **Load two-sample demo** creates labeled synthetic data.
-4. Read ECSA, E1/2, jlim, MA@0.9 V, SA@0.9 V and Tafel in the comparison table. Expand each sample's QC details; inspect the CV/ORR overlays and download plots or the standardized files, including the combined `summary.csv`.
-5. In **Multi-rpm Koutecký–Levich**, paste/import one or more CSV files using the columns below and click **Fit K–L**. The separate K–L demo recovers n = 4 and signed jk = −10 mA/cm². A current fit is also included in the workbench's `analysis.json` export; changing K–L inputs invalidates it until refitted.
-
-### QC and numerical conventions
-
-These defaults are **screening heuristics, not standards certification**. `Good` means the available checks passed, `Check recommended` indicates missing evidence or a suspect result, and `Invalid` indicates a failed required condition. Inspect `qc.checks`; do not automatically train/optimize from an Invalid sample.
-
-| Check | Default rule |
+| Task | Result |
 |---|---|
-| Diffusion plateau | Five-point running median for detection; low `abs(dj/dE)` ≤ 0.15 × robust cathodic amplitude per V; ≥7 contiguous points spanning ≥0.08 V; no gaps >0.025 V; cathodic magnitude ≥60% of robust amplitude. A resolved rising wave is required to reject flat baselines. |
-| Plateau result | Choose widest candidate, use **original current median**, report potential bounds, MAD, standard deviation and all candidate regions. Standard deviation >5% of magnitude prompts review. |
-| N₂ background | Missing background prompts review; partial coverage or gaps mark Invalid. No extrapolation. With incomplete background, the whole ORR curve remains uncorrected and is clearly flagged. |
-| CV stability | RMS difference of last two complete, comparable **anodic** sweeps / RMS of last sweep; >5% prompts review. One sweep cannot establish stability. |
-| 0.9 V transport | `abs(j/jlim) >= 0.8` prompts review; missing potential, noncathodic current or `abs(j) >= abs(jlim)` is Invalid and gives no MA/SA. |
-| Plateau sensitivity | Recompute using plateau P10/P90 and derivative thresholds ×0.5/×1.5, including alternative candidates. >10% relative jlim or MA change prompts review; singular kinetic correction is Invalid. |
-| E1/2 | Interpolated rising crossing of signed plateau median / 2. Missing crossing is Invalid. |
-| Tafel | Fit E vs log10(abs(jk)) in configurable 0.85–0.95 V range, excluding transport ratio ≥0.8. Require ≥5 points and ≥0.3 decades; report positive magnitude in mV/dec. R² <0.98 prompts review. |
+| H-upd CV integration | ECSA with baseline and integration-bound settings |
+| O₂/N₂ LSV | Background subtraction, automatic plateau detection, E½, MA/SA and Tafel diagnostics |
+| Quality checks | Explained Good / Check recommended / Invalid status |
+| Multi-sample workflow | Naming, history, restore inputs, CV/LSV overlays and selective figures |
+| Multi-rpm K–L | Signed fit, R², kinetic current; optional n with supplied electrolyte constants |
+| Exports | Exact plotted points, per-sample metrics, units, settings and QC |
+| Existing Python utilities | Autolab `.paax`, Origin `.opju`, formulas and plotting |
 
-`qc_options` can override `min_width_V`, `min_points`, `slope_fraction_per_V`, `max_gap_V`, `transport_ratio`, `stability_fraction`, and `sensitivity_fraction`. Thresholds and integration settings are saved in every sample's export. Potentials must be finite, unique and monotonic for ORR/N₂/K–L sweeps; descending sweeps are accepted. New workbench analysis does not smooth measurement values: detection smoothing never changes exported currents. The original LSV tool retains its Savitzky–Golay smoothing.
+The workbench does not silently substitute `min(j)` for a diffusion plateau. QC thresholds are screening heuristics; they do not certify standards compliance. ECSA is a method-dependent estimate, and transport-limited activity estimates need review.
 
-New workbench ECSA uses the **last complete anodic Hupd sweep**, a horizontal endpoint baseline at the upper integration bound, positive baseline-subtracted area and interpolated bounds. The original HTML Origin-style integration and Python `ecsa_from_hupd` (two-sweep mean area) remain unchanged; these distinct methods can produce different ECSA. Workbench ECSA is identical in JS and Python. Use `baseline_mA_cm2` to specify a manual baseline. Original multi-cycle selection functions remain available; workbench stability compares like-direction sweeps rather than interpolating across an entire nonmonotonic cycle.
-
-### Multi-rpm K–L import
-
-```csv
-rpm,potential_V_RHE,j_mA_cm2
-400,0.895,-1.50
-400,0.905,-1.40
-900,0.895,-1.90
-900,0.905,-1.80
-1600,0.895,-2.20
-1600,0.905,-2.10
-```
-
-Supply **already background/potential-corrected current densities**, not raw amperes. At least three distinct positive rpm are required. Interpolate without extrapolation at the specified potential, use `omega = 2*pi*rpm/60` in rad/s, and regress **signed `1/j` vs `omega^(-1/2)`**. Return slope, intercept, R², signed `jk = 1/intercept`, the sampled points, reasons and status. Cathodic ORR requires negative slope and intercept. Nonphysical fits return no jk/n; R² <0.98 prompts review. An estimated n outside 1–4.2 prompts review and is not a mechanistic diagnosis.
-
-Optional n requires all three positive constants: `D_cm2_s`, `nu_cm2_s` (kinematic viscosity), `C_mol_cm3` (dissolved oxygen concentration). The conversion is `n = 1 / (abs(slope)*1000*0.620*F*D^(2/3)*nu^(-1/6)*C)`, with F = 96485.33212 C/mol. No electrolyte constants are silently assumed. See [Pine Research K–L analysis](https://pineresearch.com/support-article/koutecky-levich-analysis-rde/) and [RDE theory and rotation units](https://pineresearch.com/support-article/rotating-disk-electrode-rde-theory/).
-
-### Python workflow
+## Python and validation
 
 ```bash
 pip install -r requirements.txt
 python run_analysis_example.py --plot
-python electrochem_analysis.py analysis_output/input.json --output my_results --plot
-# Optional multi-rpm CSV replaces the kl.traces field of the input JSON:
-python electrochem_analysis.py analysis_output/input.json --kl-csv speeds.csv --output my_results --plot
-python -X utf8 run_example.py
 python -m unittest discover -s tests -v
-```
-
-Only numpy is required for numerical analysis; pandas/matplotlib serve the existing data and plotting tools. Node.js is required only for the JS/Python parity test. `plot_comparison()` and `plot_kl()` return matplotlib figures. The bundled legacy example now resolves its PAAX file relative to the repository.
-
-Input JSON shape (short arrays below illustrate the structure; real plateau analysis requires densely sampled full curves):
-
-```json
-{
-  "samples": [{
-    "sample_id": "PtCo-01",
-    "loading_mg_cm2": 0.02,
-    "orr": {"E": [0.2, 0.204, 0.208], "j": [-5.9, -5.9, -5.9]},
-    "n2": {"E": [0.2, 0.204, 0.208], "j": [0.01, 0.01, 0.01]},
-    "cv": {"E": [0.05, 0.2, 0.4, 0.2, 0.05], "j": [0.1, 0.8, 0.1, -0.2, -0.1], "scan_rate_V_s": 0.02, "hupd_range_V": [0.05, 0.4], "q_mC_cm2": 0.21},
-    "tafel_range_V": [0.85, 0.95],
-    "metadata": {"rotation_rpm": 1600, "reference": "RHE", "additional_Ru_ohm": 0}
-  }]
-}
-```
-
-Python JSON input potentials must already be **V vs RHE**, currents **mA/cm²**, and loading **mgPt/cm²**. Existing `v_to_rhe`, `rhe_to_v`, `ir_correct`, and `current_to_density` are available for preprocessing; record the settings in `metadata`. Optional `kl` uses `{ "traces": [{"rpm": 400, "E": [...], "j": [...]}], "potential_V": 0.9, "D_cm2_s": ..., "nu_cm2_s": ..., "C_mol_cm3": ... }`.
-
-### Stable export contract — schema_version 1.0.0
-
-| File | Structure / columns in stable order |
-|---|---|
-| `analysis.json` | `schema_version`, `units`, `samples`; optional `kl`. Each sample includes `sample_id`, `metrics`, `qc`, `plateau`, `cv`, `tafel`, `metadata`, `settings`, `processed_cv`, `processed_orr`. |
-| `results.csv` | `sample_id,ecsa_m2_g,ehalf_V,jlim_mA_cm2,ma_0_9V_A_mg,sa_0_9V_mA_cm2_Pt,tafel_mV_dec,qc_status` |
-| `processed_cv.csv` | `sample_id,point_index,potential_V_RHE,j_mA_cm2` (all supplied CV points, acquisition order) |
-| `processed_orr.csv` | `sample_id,point_index,potential_V_RHE,j_raw_mA_cm2,j_background_mA_cm2,j_corrected_mA_cm2,in_plateau` (ascending E) |
-| `summary.csv` | Final all-in-one CSV with `record_type=metrics/cv_point/lsv_point`; CV/LSV rows contain the exact points used by the comparison plots. Existing stable files remain unchanged. |
-
-UTF-8, decimal point, no localized column names. Unavailable numbers are JSON `null` / empty CSV cells, never NaN/Infinity/zero placeholders. CSV booleans are `True`/`False`. IDs join all export files. `qc.checks` contains stable check codes, status, reason and values. An absent N₂ background is null, not a measured zero. A consumer such as `bayesian-optimization-electrocatalyst` should join by `sample_id`, validate `schema_version`, inspect `qc_status`, and filter missing objectives. This change does not modify or claim a tested integration with that other repository. Breaking field/unit changes require a schema major version bump.
-
-### Development
-
-Edit `web/analysis.js`, `web/workbench.js`, or `web/workbench.html`, then run `python build_html.py`. Commit the regenerated `index.html` so users still need only one file. `python build_html.py --check` detects drift. Existing page code remains in `index.html`. Tests cover analytic ORR metrics, outliers/no plateau, background coverage, CV stability, transport checks, invalid inputs, K–L units, exports, legacy formulas and full JS/Python output parity.
-
-## Browser Compatibility
-
-| Browser | Status |
-|---------|--------|
-| Chrome / Edge | ✅ Fully supported |
-| Safari | ✅ Fully supported |
-| Firefox | ✅ Fully supported |
-
-## License
-
-MIT License — see [LICENSE](LICENSE) for details.
-
-## Author
-
-**ANDYPENG09**
-
-## Acknowledgments
-
-- Integration method validated against GB/T 20042.4-2025 (China National Standard for PEM Fuel Cell Electrocatalyst Testing).
-- Baseline convention matches Origin's H-upd integration gadget (end-point horizontal baseline).
-- Savitzky-Golay smoothing for LSV noise reduction (window=7, 2nd-order polynomial).
-
-### v1.2.0 — sample history and selectable figures
-
-- The O₂/N₂ LSV input area opens by default.
-- Enter a **Sample name**, then **Analyze & add current sample**. Add further samples the same way; check the samples to overlay in the CV and LSV plots. Each exported comparison plot includes the sample names and matching colors. CV-only samples are supported.
-- Rename samples in the table; **Restore inputs** restores a browser-captured sample's original data and settings. Saving a changed sample uses a new name. Imported analysis-only records can be compared but do not contain the original form.
-- History persists in the current browser's local storage. Use **Back up history** to save all raw samples/settings to `sample_history.json`; import it using the JSON input. Duplicate imported names receive a numeric suffix. Moving the HTML, changing browsers, or clearing browser data may change/remove local history. Storage failures are shown without discarding samples from the current session.
-- Checked samples control plots and analysis/CSV exports. History backups always include all samples.
-- **Figure contents** selects ECSA–CV, LSV, the Hupd integration panel, and the results table independently. The default is CV + LSV only. **Shading and markers** toggles annotations in PNG files without changing calculations. Choose compact stacking or a 16:9 canvas; plots retain their aspect ratio. Comparison downloads have independent CV/LSV checkboxes.
-- Browser captures and the single-sample LSV tool omit O₂ endpoints outside N₂ coverage and report the count. No endpoint extrapolation is used; internal N₂ gaps over 25 mV and non-overlapping curves are rejected. Direct Python/raw-JSON analysis keeps the original full-coverage QC rule. The manual LSV tool retains its existing 7-point smoothing; workbench data remain unsmoothed.
-- Corrected stale-plot exports after clearing/editing inputs, out-of-range evaluation-potential extrapolation, and negative contributions in the manual positive-only Hupd integration.
-
-中文操作：输入第一份 CV/O₂/N₂ 数据 → 填写样品名称 →「分析并加入当前样品」→ 换第二份数据继续添加 → 勾选要比较的样品。导出时只勾选 CV 和 LSV，即不会加入数据汇总、积分区间图；取消「阴影与标记」还可去掉曲线中的区域阴影和评价点。
-
-Developer checks (Node with jsdom is **only** needed for tests; the HTML remains dependency-free):
-
-```bash
-python -m unittest discover -s tests -q
 python build_html.py --check
-npm install
+npm ci
 npm test
 ```
 
-`tests/test_ui.cjs` uses a DOM emulator and mocked PNG image/canvas I/O to check history, naming, selection, restoration, imports, storage failure, figure panel selection, legends, invalidation, coverage and language switching. It is not a full-browser rasterization test.
+Edit maintained workbench files in `web/`, then run `python build_html.py` and commit the rebuilt HTML. CI repeats the numerical, JS/Python parity, DOM and build-consistency checks on pushes and pull requests. DOM tests mock canvas/image I/O; they are not browser-pixel tests.
 
-### v1.2.1 — calculation consistency and robustness
+The Pages workflow deploys only the standalone HTML and verifies it matches the analyzed commit. An existing Pages site needs **Settings → Pages → Source: GitHub Actions** if still configured to a legacy branch; no repository visibility change is needed.
 
-Single-sample ECSA now uses the same boundary-interpolated positive-only integration as the workbench. The automatic horizontal baseline is evaluated at the selected upper integration limit (0.40 V by default), so custom-limit results may differ from older versions. SA uses full-precision ECSA and clears with invalid/cleared CV data. An unusable supplied N₂ background suppresses ORR metrics rather than silently reporting uncorrected values. Large-array interpolation uses binary search; regressions cover one million interpolation points and 150,000 plateau points.
+## Connect analysis to experiment planning
+
+Join `results.csv` to an experimental-design table by `sample_id`, retaining QC and units. See [BO handoff](docs/bo-handoff.md). The companion [BO planner](https://github.com/ANDYPENG09/bayesian-optimization-electrocatalyst) filters `Invalid` results and forecasts constraint feasibility; synthetic examples demonstrate the interface.
+
+[Changelog](CHANGELOG.md) · [MIT License](LICENSE) · Author: [Yu Peng](https://github.com/ANDYPENG09)
