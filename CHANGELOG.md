@@ -5,7 +5,7 @@
 - Add a concise entry page with usage/download links and synthetic comparison preview.
 - Move detailed numerical conventions and exports to dedicated documentation; add an explicit BO handoff guide.
 - Add reproducible npm lockfile and CI for numerical/parity, DOM and standalone-build checks.
-- Add commit-verified GitHub Pages deployment of the standalone HTML.
+- Synchronize the existing gh-pages deployment with the validated standalone HTML; record its source commit.
 - Retain v1.2.1 calculation behavior and every existing feature.
 
 

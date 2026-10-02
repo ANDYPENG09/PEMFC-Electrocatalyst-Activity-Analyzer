@@ -47,7 +47,7 @@ npm test
 
 Edit maintained workbench files in `web/`, then run `python build_html.py` and commit the rebuilt HTML. CI repeats the numerical, JS/Python parity, DOM and build-consistency checks on pushes and pull requests. DOM tests mock canvas/image I/O; they are not browser-pixel tests.
 
-The Pages workflow deploys only the standalone HTML and verifies it matches the analyzed commit. An existing Pages site needs **Settings → Pages → Source: GitHub Actions** if still configured to a legacy branch; no repository visibility change is needed.
+The existing Pages site publishes the separate `gh-pages` branch. After validation, synchronize `index.html` from the reviewed source commit to that branch and record the source SHA in `commit.txt`. Updating `main` alone does not update the live site. Keep the existing Pages source and visibility settings.
 
 ## Connect analysis to experiment planning
 
