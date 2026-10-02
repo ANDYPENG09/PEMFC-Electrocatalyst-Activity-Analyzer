@@ -15,3 +15,5 @@ venv/
 analysis_output/
 ORR_LSV*.png
 CV*.png
+
+node_modules/

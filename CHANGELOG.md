@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.2.2 — 2026-10-02
+
+- Add a concise entry page with usage/download links and synthetic comparison preview.
+- Move detailed numerical conventions and exports to dedicated documentation; add an explicit BO handoff guide.
+- Add reproducible npm lockfile and CI for numerical/parity, DOM and standalone-build checks.
+- Add commit-verified GitHub Pages deployment of the standalone HTML.
+- Retain v1.2.1 calculation behavior and every existing feature.
+
+
 ## v1.2.1 — 2026-09-23
 
 - Share the boundary-interpolated, positive-only CV integration between the single-sample tool and workbench. Automatic baseline uses the selected upper integration limit (default 0.40 V); custom limits can therefore change previously reported ECSA.
