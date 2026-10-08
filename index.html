@@ -290,7 +290,8 @@
     <div class="btn-row">
       <button class="btn" id="lsvBtn">N<sub>2</sub> Correct &amp; Extract</button>
       <button class="btn-secondary btn" id="lsvPng">Download LSV Plot</button>
-      <button class="btn-danger btn" id="lsvClear">Clear LSV</button>
+      <button class="btn-danger btn" id="lsvClear">Clear O₂ LSV</button>
+      <button class="btn-danger btn" id="n2Clear">Clear N₂ Background</button>
     </div>
     <div class="row" style="margin:6px 0 2px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
       <span style="font-size:13px;color:#424245;">Y-axis range (mA/cm²):</span>
@@ -2137,15 +2138,13 @@ $("cvClear").addEventListener("click", () => {
   $("cvPlotFull").innerHTML = ""; $("cvPlotZoom").innerHTML = "";
   updateSummary();
 });
-$("lsvClear").addEventListener("click", () => {
-  lsvResult=null; lastLsvX=null; lastLsvY=null; $("lsvPlot").replaceChildren();
-  $("lsvText").value = ""; $("n2Text").value = "";
-  $("jE").value = ""; $("jlim").value = "";
-  $("lsvMsg").textContent = "Cleared.";
-  $("lsvPlot").style.display = "none";
-  ["o_jk","o_ma","o_sa"].forEach(id => $(id).textContent = "\u2014");
-  updateSummary();
-});
+function clearLsvInput(id, message){
+  $(id).value = "";
+  invalidateLsv();
+  $("lsvMsg").textContent = message;
+}
+$("lsvClear").addEventListener("click", () => clearLsvInput("lsvText", "O₂ LSV cleared. · 已清空 O₂ LSV。"));
+$("n2Clear").addEventListener("click", () => clearLsvInput("n2Text", "N₂ background cleared. · 已清空 N₂ 背景。"));
 
 
 
@@ -2331,7 +2330,7 @@ document.querySelector('.frac-tag[data-f="30"]').classList.add("active");
   function nextName(){let n=1;while(samples.some(s=>s.sample_id===`Sample-${n}`))n++;$('wbName').value=`Sample-${n}`;}
   function restoreInputs(sample){
     if(!sample.input_state){$('wbMessage').textContent=T('This imported sample has no original input form; its curves remain available for comparison.','此导入样品没有原始输入表单；仍可参与曲线比较。');return;}
-    $('cvClear').click();$('lsvClear').click();
+    $('cvClear').click();$('lsvClear').click();$('n2Clear').click();
     for(const id of inputIds)if(Object.hasOwn(sample.input_state,id))$(id).value=sample.input_state[id];
     $('wbName').value=sample.sample_id;computePtLoad();
     if($('cvText').value.trim())calcECSA();if($('lsvText').value.trim())$('lsvBtn').click();
@@ -2504,7 +2503,7 @@ document.querySelector('.frac-tag[data-f="30"]').classList.add("active");
     ['PNG transparent background (applies to CV & LSV exports)','PNG 透明背景（适用于 CV 与 LSV 导出）'],['Hupd plot X-axis range (V):','Hupd 图 X 轴范围 (V)：'],['Min','最小'],['Max','最大'],['Apply X-axis','应用 X 轴'],
     ['ORR Mass Activity / Specific Activity','ORR 质量活性 / 比活性'],['Current Density j @ E (mA/cm²)','指定电位下电流密度 j (mA/cm²)'],['Evaluation Potential E (V vs RHE)','评价电位 E (V vs RHE)'],
     ['Auto diffusion plateau (recommended)','自动扩散平台（推荐）'],['Manual potential (legacy)','手动电位（兼容模式）'],['Evaluation Potential (V)','评价电位 (V)'],
-    ['Correct & Extract','校正并提取'],['Download LSV Plot','下载 LSV 图'],['Clear LSV','清空 LSV'],['Y-axis range (mA/cm²):','Y 轴范围 (mA/cm²)：'],['Apply Y-axis','应用 Y 轴'],
+    ['Correct & Extract','校正并提取'],['Download LSV Plot','下载 LSV 图'],['Clear O₂ LSV','清空 O₂ LSV'],['Clear N₂ Background','清空 N₂ 背景'],['Y-axis range (mA/cm²):','Y 轴范围 (mA/cm²)：'],['Apply Y-axis','应用 Y 轴'],
     ['Results Summary','结果汇总'],['Export CSV','导出 CSV'],['Export Summary (16:9)','导出汇总图 (16:9)'],
     ['Analysis Workbench · 自动 QC / 多样品比较','分析工作台 · 自动 QC / 多样品比较'],['Sample ID','样品 ID'],['Input potential reference','输入电位参比'],
     ['Additional uncompensated Ru (Ω)','附加未补偿 Ru (Ω)'],['Minimum plateau width (V)','最小平台宽度 (V)'],['Plateau slope / amplitude (V⁻¹)','平台斜率 / 幅值 (V⁻¹)'],

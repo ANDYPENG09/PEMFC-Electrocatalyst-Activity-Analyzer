@@ -13,7 +13,7 @@
     ['PNG transparent background (applies to CV & LSV exports)','PNG 透明背景（适用于 CV 与 LSV 导出）'],['Hupd plot X-axis range (V):','Hupd 图 X 轴范围 (V)：'],['Min','最小'],['Max','最大'],['Apply X-axis','应用 X 轴'],
     ['ORR Mass Activity / Specific Activity','ORR 质量活性 / 比活性'],['Current Density j @ E (mA/cm²)','指定电位下电流密度 j (mA/cm²)'],['Evaluation Potential E (V vs RHE)','评价电位 E (V vs RHE)'],
     ['Auto diffusion plateau (recommended)','自动扩散平台（推荐）'],['Manual potential (legacy)','手动电位（兼容模式）'],['Evaluation Potential (V)','评价电位 (V)'],
-    ['Correct & Extract','校正并提取'],['Download LSV Plot','下载 LSV 图'],['Clear LSV','清空 LSV'],['Y-axis range (mA/cm²):','Y 轴范围 (mA/cm²)：'],['Apply Y-axis','应用 Y 轴'],
+    ['Correct & Extract','校正并提取'],['Download LSV Plot','下载 LSV 图'],['Clear O₂ LSV','清空 O₂ LSV'],['Clear N₂ Background','清空 N₂ 背景'],['Y-axis range (mA/cm²):','Y 轴范围 (mA/cm²)：'],['Apply Y-axis','应用 Y 轴'],
     ['Results Summary','结果汇总'],['Export CSV','导出 CSV'],['Export Summary (16:9)','导出汇总图 (16:9)'],
     ['Analysis Workbench · 自动 QC / 多样品比较','分析工作台 · 自动 QC / 多样品比较'],['Sample ID','样品 ID'],['Input potential reference','输入电位参比'],
     ['Additional uncompensated Ru (Ω)','附加未补偿 Ru (Ω)'],['Minimum plateau width (V)','最小平台宽度 (V)'],['Plateau slope / amplitude (V⁻¹)','平台斜率 / 幅值 (V⁻¹)'],

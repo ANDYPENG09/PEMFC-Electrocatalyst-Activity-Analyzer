@@ -62,6 +62,15 @@ const tick=()=>new Promise(r=>setTimeout(r,20));
  // Invalid N2 coverage must not extrapolate or retain the previous LSV.
  click('loadExample');el('n2Text').value='2,0\n2.01,0';click('lsvBtn');await tick();
  assert(el('lsvMsg').textContent.includes('does not cover'));assert.equal(el('lsvPlot').querySelector('svg'),null);assert.equal(el('o_ma').textContent,'—');
+ // Each clear action preserves the other raw dataset and invalidates results.
+ click('loadExample');click('lsvBtn');
+ const retainedN2=el('n2Text').value;click('lsvClear');
+ assert.equal(el('lsvText').value,'');assert.equal(el('n2Text').value,retainedN2);
+ assert.equal(el('lsvPlot').querySelector('svg'),null);assert.equal(el('o_ma').textContent,'—');
+ click('loadExample');click('lsvBtn');
+ const retainedO2=el('lsvText').value;click('n2Clear');
+ assert.equal(el('n2Text').value,'');assert.equal(el('lsvText').value,retainedO2);
+ assert.equal(el('lsvPlot').querySelector('svg'),null);assert.equal(el('o_ma').textContent,'—');
  // Unit/input changes immediately invalidate stale data.
  click('loadExample');click('lsvBtn');el('lsvText').dispatchEvent(new w.Event('input'));assert.equal(el('lsvPlot').querySelector('svg'),null);
  // Language toggle remains usable with saved history.

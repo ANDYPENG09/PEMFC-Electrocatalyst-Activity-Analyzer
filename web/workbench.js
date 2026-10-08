@@ -19,7 +19,7 @@
   function nextName(){let n=1;while(samples.some(s=>s.sample_id===`Sample-${n}`))n++;$('wbName').value=`Sample-${n}`;}
   function restoreInputs(sample){
     if(!sample.input_state){$('wbMessage').textContent=T('This imported sample has no original input form; its curves remain available for comparison.','此导入样品没有原始输入表单；仍可参与曲线比较。');return;}
-    $('cvClear').click();$('lsvClear').click();
+    $('cvClear').click();$('lsvClear').click();$('n2Clear').click();
     for(const id of inputIds)if(Object.hasOwn(sample.input_state,id))$(id).value=sample.input_state[id];
     $('wbName').value=sample.sample_id;computePtLoad();
     if($('cvText').value.trim())calcECSA();if($('lsvText').value.trim())$('lsvBtn').click();

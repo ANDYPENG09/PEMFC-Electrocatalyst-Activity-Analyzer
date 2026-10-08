@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.2.2 — 2026-10-08
+
+- Split O₂ LSV and N₂ background clearing into independent bilingual buttons. Each preserves the other raw dataset and invalidates the previous corrected curve and ORR results.
+- Clear both inputs explicitly when restoring a saved sample, preventing background data from leaking between samples.
+- Add DOM regressions for independent clearing and stale-result removal.
+
 ## v1.2.2 — 2026-10-02
 
 - Add a concise entry page with usage/download links and synthetic comparison preview.
