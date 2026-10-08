@@ -16,6 +16,8 @@ read_paax(path) -> dict:
 """
 from __future__ import annotations
 import re
+import xml.etree.ElementTree as ET
+from pathlib import Path
 import urllib.parse
 import numpy as np
 
@@ -25,33 +27,60 @@ def _decode(s: str) -> str:
 
 
 def read_paax(path: str) -> dict:
-    txt = open(path, encoding="utf-8", errors="replace").read()
-    traces: dict = {}
-    pat = re.compile(r'<DAB_node type="trace"[^>]*>(.*?)</DAB_node>', re.S)
-    idx = 0
-    for m in pat.finditer(txt):
-        block = m.group(1)
-        nm = re.search(r'<name length="\d+" encoding="mixed">(.*?)</name>', block)
-        name = _decode(nm.group(1)) if nm else f"trace_{idx}"
-        xu = re.search(r'<X_units[^>]*qty_kind="([^"]+)"', block)
-        yu = re.search(r'<Y_units[^>]*qty_kind="([^"]+)"', block)
-        xkind = xu.group(1) if xu else "?"
-        ykind = yu.group(1) if yu else "?"
-
-        Xs, Ys = [], []
-        for pm in re.finditer(r"<points quantity=\"\d+\">(.*?)</points>", block, re.S):
-            pb = pm.group(1)
-            xm = re.search(r"<X_data>(.*?)</X_data>", pb, re.S)
-            ym = re.search(r"<Y_data>(.*?)</Y_data>", pb, re.S)
-            if xm and ym:
-                Xs.append(np.fromstring(xm.group(1), sep=","))
-                Ys.append(np.fromstring(ym.group(1), sep=","))
-
-        X = np.concatenate(Xs) if Xs else np.array([])
-        Y = np.concatenate(Ys) if Ys else np.array([])
-        key = name if name not in traces else f"{name}_{idx}"
-        traces[key] = {"X": X, "Y": Y, "xunit": xkind, "yunit": ykind}
-        idx += 1
+    """Read ordered trace points; reject malformed XML and inconsistent numeric arrays."""
+    txt = Path(path).read_text(encoding="utf-8-sig", errors="strict")
+    if re.search(r"<!DOCTYPE|<!ENTITY", txt, re.I):
+        raise ValueError("Unsupported PAAX XML declaration")
+    try:
+        root = ET.fromstring(txt)
+    except ET.ParseError as exc:
+        raise ValueError("Invalid PAAX XML") from exc
+    traces = {}
+    nodes = [node for node in root.iter("DAB_node") if node.get("type") == "trace"]
+    if not nodes:
+        raise ValueError("No PAAX traces found")
+    for idx, node in enumerate(nodes):
+        base = _decode(node.findtext("name") or f"trace_{idx}")
+        name, suffix = base, 2
+        while name in traces:
+            name = f"{base} ({suffix})"
+            suffix += 1
+        xu, yu = node.find("X_units"), node.find("Y_units")
+        xkind = xu.get("qty_kind", "?") if xu is not None else "?"
+        ykind = yu.get("qty_kind", "?") if yu is not None else "?"
+        xs, ys = [], []
+        def blocks(parent):
+            for child in parent:
+                if child.tag == "DAB_node" and child.get("type") == "trace":
+                    continue
+                if child.tag == "points":
+                    yield child
+                else:
+                    yield from blocks(child)
+        for block in blocks(node):
+            data = []
+            for axis in ("X_data", "Y_data"):
+                text = block.findtext(axis)
+                if text is None:
+                    raise ValueError(f"{name}: missing {axis}")
+                tokens = text.strip().split(",") if text.strip() else []
+                try:
+                    values = np.array([float(t) for t in tokens], dtype=float)
+                except ValueError as exc:
+                    raise ValueError(f"{name}: invalid {axis} numeric value") from exc
+                if not np.isfinite(values).all():
+                    raise ValueError(f"{name}: nonfinite {axis} value")
+                data.append(values)
+            x, y = data
+            if x.size != y.size:
+                raise ValueError(f"{name}: X/Y point counts differ")
+            quantity = block.get("quantity")
+            if quantity is not None and (not quantity.isdecimal() or int(quantity) != x.size):
+                raise ValueError(f"{name}: declared point count differs from data")
+            xs.append(x); ys.append(y)
+        traces[name] = {"X": np.concatenate(xs) if xs else np.array([]),
+                        "Y": np.concatenate(ys) if ys else np.array([]),
+                        "xunit": xkind, "yunit": ykind}
     return traces
 
 

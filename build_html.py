@@ -12,11 +12,13 @@ def build(check=False):
     core="<!-- ANALYSIS CORE START -->\n<script>\n"+(ROOT/"web/analysis.js").read_text(encoding="utf-8")+"\n</script>\n<!-- ANALYSIS CORE END -->"
     lang="<!-- I18N SCRIPT START -->\n<script>\n"+(ROOT/"web/i18n.js").read_text(encoding="utf-8")+"\n</script>\n<!-- I18N SCRIPT END -->"
     ui="<!-- WORKBENCH SCRIPT START -->\n<script>\n"+(ROOT/"web/workbench.js").read_text(encoding="utf-8")+"\n</script>\n<!-- WORKBENCH SCRIPT END -->"
+    paax="<!-- PAAX SCRIPT START -->\n<script>\n"+(ROOT/"web/paax.js").read_text(encoding="utf-8")+"\n</script>\n<!-- PAAX SCRIPT END -->"
     new=old
     for start,end,content,anchor in [("WORKBENCH START","WORKBENCH END",html,"<footer>"),
                                      ("ANALYSIS CORE START","ANALYSIS CORE END",core,"<script>"),
                                      ("I18N SCRIPT START","I18N SCRIPT END",lang,"</body>"),
-                                     ("WORKBENCH SCRIPT START","WORKBENCH SCRIPT END",ui,"</body>")]:
+                                     ("WORKBENCH SCRIPT START","WORKBENCH SCRIPT END",ui,"</body>"),
+                                     ("PAAX SCRIPT START","PAAX SCRIPT END",paax,"</body>")]:
         pattern=rf"<!-- {start} -->.*?<!-- {end} -->"
         if re.search(pattern,new,flags=re.S):
             new=re.sub(pattern,lambda m:content,new,flags=re.S)

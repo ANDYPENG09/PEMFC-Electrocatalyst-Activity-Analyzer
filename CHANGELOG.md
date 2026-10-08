@@ -1,10 +1,13 @@
 # Changelog
 
-## v1.2.2 — 2026-10-08
+## v1.3.0 — 2026-10-08
 
 - Split O₂ LSV and N₂ background clearing into independent bilingual buttons. Each preserves the other raw dataset and invalidates the previous corrected curve and ORR results.
 - Clear both inputs explicitly when restoring a saved sample, preventing background data from leaking between samples.
-- Add DOM regressions for independent clearing and stale-result removal.
+- Add direct offline PAAX import with trace selection, point counts, unit conversion and CV/O₂/N₂ targets. Reject invalid XML, inconsistent arrays, malformed numeric values and unsupported trace kinds/units; preserve multi-block point order and disambiguate duplicate names.
+- Preserve the other LSV dataset when the shared potential-unit setting changes during import.
+- Harden the Python PAAX reader with XML parsing, complete numeric validation and block-length checks.
+- Add PAAX and independent-clear DOM regressions using bundled and synthetic fixtures; all 18 Python/numerical tests pass.
 
 ## v1.2.2 — 2026-10-02
 
