@@ -58,3 +58,7 @@ Join `results.csv` to an experimental-design table by `sample_id`, retaining QC 
 ### v1.2.2 — independent LSV input clearing
 
 **Clear O₂ LSV** preserves N₂ background data for reuse. **Clear N₂ Background** preserves the O₂ LSV data. Both actions clear the previous corrected plot and ORR results; run extraction again after updating the input. Restoring a saved sample replaces both inputs with that sample’s saved data.
+
+### v1.3.0 — direct PAAX import
+
+Open **Import Autolab NOVA PAAX**, choose a `.paax` file, select a potential/current trace, then choose **Load into CV**, **Load into O₂ LSV**, or **Load into N₂ Background**. No Origin or Python is required by the HTML. Multi-block point order is preserved, duplicate names receive suffixes, and supported explicit units are converted to V/A. When unit labels are absent, `qty_kind=potential/current` is interpreted as V/A, matching the Python reader convention. Confirm the scan rate, potential reference and catalyst loading yourself; they are not inferred from trace names. Import replaces only the chosen input, preserves the other raw dataset and clears obsolete calculated results. The bundled PAAX fixture is synthetic demonstration data.
