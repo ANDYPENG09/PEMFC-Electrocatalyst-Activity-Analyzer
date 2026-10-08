@@ -54,3 +54,7 @@ The existing Pages site publishes the separate `gh-pages` branch. After validati
 Join `results.csv` to an experimental-design table by `sample_id`, retaining QC and units. See [BO handoff](docs/bo-handoff.md). The companion [BO planner](https://github.com/ANDYPENG09/bayesian-optimization-electrocatalyst) filters `Invalid` results and forecasts constraint feasibility; synthetic examples demonstrate the interface.
 
 [Changelog](CHANGELOG.md) · [MIT License](LICENSE) · Author: [Yu Peng](https://github.com/ANDYPENG09)
+
+### v1.2.2 — independent LSV input clearing
+
+**Clear O₂ LSV** preserves N₂ background data for reuse. **Clear N₂ Background** preserves the O₂ LSV data. Both actions clear the previous corrected plot and ORR results; run extraction again after updating the input. Restoring a saved sample replaces both inputs with that sample’s saved data.
