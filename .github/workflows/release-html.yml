@@ -1,0 +1,50 @@
+name: Publish standalone HTML
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/release-html.yml']
+  workflow_dispatch:
+  release:
+    types: [published]
+permissions:
+  contents: write
+concurrency:
+  group: release-html-${{ github.event.release.tag_name || 'v1.3.0' }}
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: pip install -r requirements.txt
+      - run: npm ci
+      - run: python -m unittest discover -s tests -q
+      - run: npm test
+      - run: python build_html.py --check
+      - name: Create release if needed and attach HTML
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || 'v1.3.0' }}
+          SOURCE_SHA: ${{ github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            test "$EVENT_NAME" != release
+            test "$RELEASE_TAG" = v1.3.0
+            gh release create "$RELEASE_TAG" --target "$SOURCE_SHA" \
+              --title 'v1.3.0 — Direct PAAX Import and Independent Data Clearing' \
+              --notes-file docs/release-v1.3.0.md --latest
+          fi
+          gh release upload "$RELEASE_TAG" index.html --clobber
+          sha256sum index.html
