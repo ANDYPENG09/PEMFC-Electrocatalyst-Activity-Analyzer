@@ -34,6 +34,27 @@ def kl_data():
 
 
 class AnalysisTests(unittest.TestCase):
+    def test_example_orr_figure_matches_calculator(self):
+        from generate_doc_figures import example_curves
+        cv, eo, corrected = example_curves()
+        self.assertEqual(len(cv["E"]), 470)
+        program = r"""
+const fs=require('fs'),a=require('./web/analysis.js'),d=require('./web/example.json');
+const source=fs.readFileSync('index.html','utf8');
+eval(source.match(/function sgSmooth\(y, win\)\{[\s\S]*?\n\}/)[0]);
+const parse=s=>s.trim().split('\n').map(line=>line.trim().split(/\s+/).map(Number));
+const n=parse(d.n2),o=parse(d.o2),area=.19625;
+let [nx,ny]=a.sweeps(n.map(x=>x[0]),n.map(x=>x[1]*1000/area)).filter(b=>b[0].at(-1)>b[0][0]).at(-1);
+[nx,ny]=a.curve(nx,ny);
+let [ox,oy]=a.curve(o.map(x=>x[0]),o.map(x=>x[1]*1000/area));
+const p=ox.map((e,i)=>({e,j:oy[i]})).filter(p=>p.e>=nx[0]&&p.e<=nx.at(-1));
+const result=sgSmooth(p.map(p=>p.j-a.interp(nx,ny,p.e)),7);
+console.log(JSON.stringify({x:p.map(p=>p.e),j:result}));
+"""
+        js=json.loads(subprocess.run(["node","-e",program],capture_output=True,text=True,cwd=ROOT,check=True).stdout)
+        np.testing.assert_allclose(eo,js["x"],rtol=0,atol=1e-12)
+        np.testing.assert_allclose(corrected,js["j"],rtol=1e-12,atol=1e-12)
+
     def test_sloped_baseline_crossings_and_browser_parity(self):
         cv=dict(E=[0,.1,.2],j=[-1,1.1,-.8],hupd_range_V=[0,.2],
                 baseline_endpoints_mA_cm2=[0,.2],scan_rate_V_s=.02)

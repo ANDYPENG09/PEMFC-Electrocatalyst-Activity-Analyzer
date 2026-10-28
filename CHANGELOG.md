@@ -2,7 +2,7 @@
 
 ## Unreleased — restore anonymized example
 
-Restore the original anonymized CV, N₂ and O₂ example data under the generic sample name Example. The ECSA illustration uses that same CV and calculation; the separate two-sample comparison remains synthetic.
+Restore the original anonymized CV, N₂ and O₂ example data under the generic sample name Example. The ECSA and CV/ORR illustrations use those same data; the separate two-sample workbench demo remains synthetic.
 
 ## Unreleased — example curve shape and provenance
 
