@@ -20,6 +20,10 @@ This figure uses the same anonymized **Example** CV data as the single-sample ca
 
 *The ORR curve subtracts the N₂ background over the shared potential range and uses the calculator's seven-point smoothing. The separate two-sample workbench demo is synthetic.*
 
+## Applications and quality support
+
+The companion [Technical Support & Quality Workbench](technical-support/README.md) reviews analyzer exports, checks test context and user-entered specifications, documents troubleshooting hypotheses, and prepares a bilingual report. [Open the support workbench](https://andypeng09.github.io/PEMFC-Electrocatalyst-Activity-Analyzer/technical-support/).
+
 ## Start in one minute
 
 1. Open the workbench or save and open `index.html` locally.
