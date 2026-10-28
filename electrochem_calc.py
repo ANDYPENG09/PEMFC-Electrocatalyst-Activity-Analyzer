@@ -240,13 +240,15 @@ def ecsa_from_hupd(E, j, v, e_lo: float = 0.05, e_hi: float = 0.4,
 
     步骤：
       1) 把单圈 CV 拆成 正向(电位升) / 反向(电位降) 两段；
-      2) 各段在 [e_lo, e_hi] 内对 j(mA/cm²) 积分 S = ∫j dE (mA·V/cm²)；
+      2) 各段在 [e_lo, e_hi] 内对已扣除基线的 j(mA/cm²) 积分 S = ∫j dE (mA·V/cm²)；
       3) S_H = (|S_正向| + |S_反向|)/2；Q_H = S_H / v (mC/cm², 几何)；
       4) ECSA_geo = Q_H·A_geo / q_specific；粗糙因子 RF = Q_H / q_specific；
       5) 若给出 Pt 载量 loading_ug_cm2，按常用公式算比表面积：
          ECSA(m²/g) = 100·S_H / (q_specific_mC·v·loading_ug_cm2)。
 
-    参数：v 扫速(V/s)；q_specific Pt 单层 Hupd 电荷≈210 µC/cm²(0.21 mC/cm²)。
+    此旧接口不自动扣双电层基线；输入 j 前须对正反向分别扣除。
+    需要自动基线的工作台算法请使用 electrochem_analysis.cv_analysis。
+    参数：v 扫速(V/s)；q_specific 单位 C/cm²，默认 210 µC/cm²。
     返回含各量的 dict，单位见键名。
     """
     E = np.asarray(E, float)
@@ -269,7 +271,8 @@ def ecsa_from_hupd(E, j, v, e_lo: float = 0.05, e_hi: float = 0.4,
     Sf, Sb = _sint(Ef, jf), _sint(Eb, jb)
     S_H = (abs(Sf) + abs(Sb)) / 2.0          # mA·V/cm² (几何)
     Q_H = S_H / v                            # mC/cm² (几何)
-    ecsa_cm2 = Q_H * area_cm2 / q_specific
+    # Q_H is mC/cm²_geo; q_specific is C/cm²_Pt.
+    ecsa_cm2 = Q_H * area_cm2 / (q_specific * 1e3)
     out = {
         "S_fwd_mA_V_per_cm2": Sf,
         "S_bwd_mA_V_per_cm2": Sb,

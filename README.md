@@ -4,7 +4,15 @@ Offline **CV / ORR analysis** for catalyst R&D: ECSA, mass activity, specific ac
 
 **[Open the workbench](https://andypeng09.github.io/PEMFC-Electrocatalyst-Activity-Analyzer/)** · **[Download current HTML](https://raw.githubusercontent.com/ANDYPENG09/PEMFC-Electrocatalyst-Activity-Analyzer/main/index.html)** · [Releases](https://github.com/ANDYPENG09/PEMFC-Electrocatalyst-Activity-Analyzer/releases) · [Methods and export schema](docs/methods-and-exports.md)
 
-Current source: **v1.2.2**. One self-contained `index.html`, English / 中文, no installation or data upload. Download/save the HTML to use offline; a raw download link may display source text in your browser.
+Current source: **v1.3.0 plus unreleased ECSA fixes**. One self-contained `index.html`, English / 中文, no installation or data upload. Download/save the HTML to use offline; a raw download link may display source text in your browser. The v1.3.0 release asset predates the ECSA fixes: use the current HTML or workbench above.
+
+### How H-upd ECSA is calculated
+
+![Synthetic Pt-like CV and H-upd desorption integration](docs/ecsa-hupd.svg)
+
+The last complete **anodic** sweep supplies the H-desorption curve. The green area is the positive current above the selected horizontal baseline between the integration limits (0.05–0.40 V vs RHE by default). Divide that area by scan rate to obtain charge, then divide by the H-upd reference charge and Pt loading. The baseline and limits must be checked for the experiment; a horizontal baseline is an approximation.
+
+### Synthetic sample comparison
 
 ![Synthetic two-sample comparison](docs/example-comparison.svg)
 
@@ -55,7 +63,7 @@ Join `results.csv` to an experimental-design table by `sample_id`, retaining QC 
 
 [Changelog](CHANGELOG.md) · [MIT License](LICENSE) · Author: [Yu Peng](https://github.com/ANDYPENG09)
 
-### v1.2.2 — independent LSV input clearing
+### v1.3.0 — independent LSV input clearing
 
 **Clear O₂ LSV** preserves N₂ background data for reuse. **Clear N₂ Background** preserves the O₂ LSV data. Both actions clear the previous corrected plot and ORR results; run extraction again after updating the input. Restoring a saved sample replaces both inputs with that sample’s saved data.
 

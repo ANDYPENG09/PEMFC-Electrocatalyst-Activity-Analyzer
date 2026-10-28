@@ -9,7 +9,7 @@ A self-contained, offline electrochemistry calculator for **PEM fuel cell cataly
 - **ECSA via H-upd method** — Integrates the hydrogen underpotential deposition (H-upd) desorption peak from forward-scan CV, with automatic baseline subtraction (end-point horizontal baseline, compatible with Origin).
 - **ORR mass / specific activity** — Paste O₂ and N₂ LSV curves; auto N₂ background correction, Savitzky-Golay smoothing, kinetic current via Koutecký–Levich equation.
 - **Full CV cycle export** — Plots show the complete anodic + cathodic sweep; H-upd integration region highlighted; baseline and peak area clearly visualized.
-- **Three-standard compatibility** — Based on GB/T 20042.4-2025, methods compatible with US DOE and EU JRC/IEC protocols (q = 0.21 mC/cm²).
+- **H-upd charge convention** — Uses a configurable Pt charge density (default 0.21 mC/cm²Pt); the user must select a suitable experimental protocol and baseline.
 - **Ink-concentration loading** — Catalyst loading auto-calculated from ink concentration (mg/mL), drop volume (µL), RDE area, and Pt weight fraction (30%/50% preset buttons).
 - **Analysis workbench** — Automatic diffusion plateau, explained QC, multi-rpm K–L fitting, multi-sample comparison and versioned JSON/CSV exports in the same offline page and Python core.
 - **Bilingual offline UI** — Switch the standalone HTML between English and Chinese without reloading or internet access.
@@ -112,7 +112,9 @@ These defaults are **screening heuristics, not standards certification**. `Good`
 
 `qc_options` can override `min_width_V`, `min_points`, `slope_fraction_per_V`, `max_gap_V`, `transport_ratio`, `stability_fraction`, and `sensitivity_fraction`. Thresholds and integration settings are saved in every sample's export. Potentials must be finite, unique and monotonic for ORR/N₂/K–L sweeps; descending sweeps are accepted. New workbench analysis does not smooth measurement values: detection smoothing never changes exported currents. The original LSV tool retains its Savitzky–Golay smoothing.
 
-New workbench ECSA uses the **last complete anodic Hupd sweep**, a horizontal endpoint baseline at the upper integration bound, positive baseline-subtracted area and interpolated bounds. The original HTML Origin-style integration and Python `ecsa_from_hupd` (two-sweep mean area) remain unchanged; these distinct methods can produce different ECSA. Workbench ECSA is identical in JS and Python. Use `baseline_mA_cm2` to specify a manual baseline. Original multi-cycle selection functions remain available; workbench stability compares like-direction sweeps rather than interpolating across an entire nonmonotonic cycle.
+The single-sample HTML and workbench use the **last complete anodic Hupd sweep**, a horizontal endpoint baseline at the upper integration bound, positive baseline-subtracted area and interpolated bounds. Where the measured line crosses the baseline, an interpolated crossing is inserted before integration. The plotted line remains the measured line; only the filled area is clipped at the baseline. This convention is identical in the JS and Python workbench cores. Use `baseline_mA_cm2` to specify a manual baseline. A horizontal baseline is an approximation and may be unsuitable for some supports or protocols.
+
+The legacy Python `ecsa_from_hupd` remains a distinct two-sweep mean method: it integrates the currents supplied and **does not subtract a baseline**. Supply separately baseline-corrected currents for each branch, or use `electrochem_analysis.cv_analysis` for automatic endpoint-baseline subtraction. Its returned Pt area and roughness factor now correctly convert mC to C; specific ECSA units were already converted separately. Results from the two methods can differ.
 
 ### Multi-rpm K–L import
 
@@ -196,8 +198,7 @@ MIT License — see [LICENSE](../LICENSE) for details.
 
 ## Acknowledgments
 
-- Integration method validated against GB/T 20042.4-2025 (China National Standard for PEM Fuel Cell Electrocatalyst Testing).
-- Baseline convention matches Origin's H-upd integration gadget (end-point horizontal baseline).
+- The ECSA calculation uses a user-selected integration range and an endpoint or manual horizontal baseline; standards compliance depends on the full experimental protocol.
 - Savitzky-Golay smoothing for LSV noise reduction (window=7, 2nd-order polynomial).
 
 ### v1.2.0 — sample history and selectable figures

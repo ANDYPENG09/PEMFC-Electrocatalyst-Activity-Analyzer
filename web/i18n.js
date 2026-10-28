@@ -3,7 +3,7 @@
   const exact = new Map([
     ['Import Autolab NOVA PAAX','导入 Autolab NOVA PAAX'],['PAAX file','PAAX 文件'],['Select PAAX trace','选择 PAAX 曲线'],['Load into CV','导入 CV'],['Load into O₂ LSV','导入 O₂ LSV'],['Load into N₂ Background','导入 N₂ 背景'],
     ['Read PAAX files directly, select a potential/current trace, then load it into CV, O₂ LSV or N₂ background. Imported values use V and A. Confirm scan rate, reference and loading before calculation.','直接读取 PAAX，选择电位/电流曲线后导入 CV、O₂ LSV 或 N₂ 背景；导入值使用 V 和 A。计算前请确认扫描速率、参比和载量。'],
-    ['Test Standard','测试标准'],
+    ['Method note','方法说明'],
     ['Electrochemical Surface Area (ECSA · Hupd Method)','电化学活性表面积（ECSA · Hupd 法）'],
     ['Scan Rate','扫描速率'],['Pt Monolayer Charge q','Pt 单层氢吸附电荷 q'],['RDE Geometric Area (cm²)','RDE 几何面积 (cm²)'],
     ['Ink Concentration (mg/mL)','墨水浓度 (mg/mL)'],['Drop Volume (µL)','滴涂体积 (µL)'],['Pt Weight Fraction (%)','Pt 质量分数 (%)'],['→ Pt Loading (µg/cm²)','→ Pt 载量 (µg/cm²)'],
@@ -49,7 +49,7 @@
   exact.set("Multi-rpm Koutecký–Levich · 多转速拟合","多转速拟合");
   const phrases = [
     ['Hupd background subtraction · ECSA · ORR mass/specific activity · Offline calculation','Hupd 背景扣除 · ECSA · ORR 质量/比活性 · 离线计算'],
-    ['Based on GB/T 20042.4-2025. Methods are compatible with US DOE and EU JRC/IEC protocols (Hupd ECSA, K-L kinetic current, q = 0.21 mC/cm²).','基于 GB/T 20042.4-2025；方法兼容美国 DOE 与欧盟 JRC/IEC 常用流程（Hupd ECSA、K-L 动力学电流，q = 0.21 mC/cm²）。'],
+    ['Hupd ECSA and K-L kinetic current; the default Pt charge density is 0.21 mC/cm². Check the baseline and experimental protocol for your data.','采用 Hupd ECSA 和 K-L 动力学电流；默认 Pt 电荷密度为 0.21 mC/cm²。请根据实际数据检查基线和实验流程。'],
     ['Capture the current CV/O₂/N₂ inputs, or import sample JSON files. Each capture is a snapshot; recapture after changing inputs. Analysis uses cathodic currents and a continuous diffusion plateau. Missing results are shown as —.','可捕获当前 CV/O₂/N₂ 输入，或导入样品 JSON。每次捕获都是快照，修改输入后需重新捕获。分析采用阴极电流与连续扩散平台；缺失结果显示为 —。'],
     ['RHE conversion and E − I·Ru apply only to captured workbench data. Use Ru = 0 if already corrected. Hupd bounds above are interpreted in V vs RHE here. Original manual calculators remain available.','RHE 换算与 E − I·Ru 仅作用于工作台捕获的数据；若数据已校正，请设 Ru = 0。此处 Hupd 范围按 V vs RHE 解释；原手动计算器仍保留。'],
     ['Paste/import CSV: rpm,potential_V_RHE,j_mA_cm2. Supply a single corrected ORR sweep per rpm, at least three distinct speeds. Values must already be in V vs RHE and mA/cm²; no background or potential correction is applied here.','粘贴/导入 CSV：rpm,potential_V_RHE,j_mA_cm2。每个转速提供一条已校正 ORR 扫描，至少三个不同转速。数据必须已为 V vs RHE 与 mA/cm²；此处不再做背景或电位校正。'],
