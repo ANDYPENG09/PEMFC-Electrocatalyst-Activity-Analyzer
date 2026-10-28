@@ -112,8 +112,8 @@
 
 <!-- Standard info -->
 <div class="card">
-  <div class="card-title">Test Standard</div>
-  <p class="std-desc">Based on GB/T 20042.4-2025. Methods are compatible with US DOE and EU JRC/IEC protocols (Hupd ECSA, K-L kinetic current, q = 0.21 mC/cm²).</p>
+  <div class="card-title">Method note</div>
+  <p class="std-desc">Hupd ECSA and K-L kinetic current; the default Pt charge density is 0.21 mC/cm². Check the baseline and experimental protocol for your data.</p>
 </div>
 
 <!-- ECSA -->
@@ -169,6 +169,16 @@
       <input type="number" id="ptLoad" step="any" readonly>
     </div>
   </div>
+
+  <details class="advanced" open>
+    <summary>Import Autolab NOVA PAAX</summary>
+    <p class="hint">Read PAAX files directly, select a potential/current trace, then load it into CV, O₂ LSV or N₂ background. Imported values use V and A. Confirm scan rate, reference and loading before calculation.</p>
+    <div class="field"><label for="paaxFile">PAAX file</label><input type="file" id="paaxFile" accept=".paax,.xml"></div>
+    <div class="field"><label for="paaxTrace">Select PAAX trace</label><select id="paaxTrace"></select></div>
+    <div class="btn-row"><button class="btn btn-secondary" id="paaxCv" disabled>Load into CV</button><button class="btn btn-secondary" id="paaxO2" disabled>Load into O₂ LSV</button><button class="btn btn-secondary" id="paaxN2" disabled>Load into N₂ Background</button></div>
+    <p id="paaxMessage" role="status" aria-live="polite"></p>
+    <div style="overflow-x:auto"><table class="summary" id="paaxTable"></table></div>
+  </details>
 
   <details class="advanced">
     <summary>Advanced Integration Settings</summary>
@@ -290,7 +300,8 @@
     <div class="btn-row">
       <button class="btn" id="lsvBtn">N<sub>2</sub> Correct &amp; Extract</button>
       <button class="btn-secondary btn" id="lsvPng">Download LSV Plot</button>
-      <button class="btn-danger btn" id="lsvClear">Clear LSV</button>
+      <button class="btn-danger btn" id="lsvClear">Clear O₂ LSV</button>
+      <button class="btn-danger btn" id="n2Clear">Clear N₂ Background</button>
     </div>
     <div class="row" style="margin:6px 0 2px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
       <span style="font-size:13px;color:#424245;">Y-axis range (mA/cm²):</span>
@@ -391,7 +402,7 @@
   <pre id="klResult" style="white-space:pre-wrap" aria-live="polite"></pre><div class="plot" id="klPlot"></div>
 </section>
 <!-- WORKBENCH END -->
-<footer>v1.2.2 &middot; MIT License &middot; Author: ANDYPENG09 &middot; Pure HTML/JS &middot; Offline &middot; No Origin Required</footer>
+<footer>v1.3.0 + ECSA fixes &middot; MIT License &middot; Author: ANDYPENG09 &middot; Pure HTML/JS &middot; Offline &middot; No Origin Required</footer>
 
 </div>
 
@@ -459,6 +470,26 @@ const ECAnalysis = (() => {
     for(let i=1;i<x.length;i++){const sign=Math.sign(x[i]-x[i-1]);if(sign&&direction&&sign!==direction){if(i-start>=3)out.push([x.slice(start,i),y.slice(start,i)]);start=i-1;}if(sign)direction=sign;}
     if(x.length-start>=3)out.push([x.slice(start),y.slice(start)]);return out;
   }
+  // Insert exact baseline crossings before clipping, so the shaded polygon and
+  // its trapezoidal area match the positive part of the measured line segments.
+  function hupdRegion(x,y,lo,hi,baseline){
+    const points=[lo,...x.filter(v=>v>lo&&v<hi),hi],px=[],current=[];
+    for(let i=0;i<points.length;i++){
+      const value=interp(x,y,points[i],Infinity);
+      if(i){
+        const previous=current.at(-1)-baseline, next=value-baseline;
+        if(previous*next<0){
+          px.push(px.at(-1)+(points[i]-px.at(-1))*(-previous)/(next-previous));
+          current.push(baseline);
+        }
+      }
+      px.push(points[i]);current.push(value);
+    }
+    const upper=current.map(v=>Math.max(baseline,v));
+    let area=0;
+    for(let i=1;i<px.length;i++)area+=(px[i]-px[i-1])*(upper[i]+upper[i-1]-2*baseline)/2;
+    return {x:px,current,upper,area};
+  }
   function cvAnalysis(cv,loading){
     const empty={ecsa_m2_g:null,stability_fraction:null,anodic_sweeps:0};if(!cv)return empty;
     const [lo,hi]=cv.hupd_range_V||[0.05,0.4],rate=cv.scan_rate_V_s??0.02,q=cv.q_mC_cm2??0.21;
@@ -467,8 +498,7 @@ const ECAnalysis = (() => {
     if(!branches.length)return empty;
     const [x,y]=branches.at(-1),baseline=cv.baseline_mA_cm2??interp(x,y,hi,Infinity);
     if(!Number.isFinite(baseline))throw Error('CV baseline must be finite');
-    const xx=[lo,...x.filter(v=>v>lo&&v<hi),hi],yy=xx.map(v=>Math.max(0,interp(x,y,v,Infinity)-baseline));
-    let sh=0;for(let i=1;i<xx.length;i++)sh+=(xx[i]-xx[i-1])*(yy[i]+yy[i-1])/2;
+    const sh=hupdRegion(x,y,lo,hi,baseline).area;
     let stability=null;
     if(branches.length>=2){const [a,b]=branches.slice(-2),l=Math.max(a[0][0],b[0][0]),h=Math.min(a[0].at(-1),b[0].at(-1)),grid=Array.from({length:101},(_,i)=>l+(h-l)*i/100),ya=grid.map(v=>interp(...a,v,Infinity)),yb=grid.map(v=>interp(...b,v,Infinity));stability=Math.sqrt(mean(ya.map((v,i)=>(v-yb[i])**2)))/Math.max(Math.sqrt(mean(yb.map(v=>v*v))),1e-12);}
     return {ecsa_m2_g:loading&&sh>0?100*sh/(q*rate*loading*1000):null,stability_fraction:stability,anodic_sweeps:branches.length,SH_mA_V_cm2:sh,baseline_mA_cm2:baseline};
@@ -537,7 +567,7 @@ const ECAnalysis = (() => {
     return rows;
   }
   function exports(analysis){return {'analysis.json':JSON.stringify(analysis,null,2),'results.csv':csv(resultFields,analysis.samples.map(s=>({sample_id:s.sample_id,...s.metrics,qc_status:s.qc.status}))),'processed_cv.csv':csv(cvFields,analysis.samples.flatMap(s=>s.processed_cv)),'processed_orr.csv':csv(orrFields,analysis.samples.flatMap(s=>s.processed_orr)),'summary.csv':csv(summaryFields,summaryRows(analysis))};}
-  return {defaults,plateau,halfWave,kinetic,curve,interp,sweeps,cvAnalysis,klFit,analyzeSample,analyzeBatch,exports,resultFields,summaryFields,summaryRows};
+  return {defaults,plateau,halfWave,kinetic,curve,interp,sweeps,hupdRegion,cvAnalysis,klFit,analyzeSample,analyzeBatch,exports,resultFields,summaryFields,summaryRows};
 })();
 if(typeof module!=='undefined')module.exports=ECAnalysis;
 
@@ -1994,21 +2024,20 @@ function calcECSA(){
     if(!Number.isFinite(result.SH_mA_V_cm2))throw Error('No anodic sweep covers the integration range / 没有完整覆盖积分范围的阳极扫描');
     const [sx,sy]=ECAnalysis.sweeps(X,Y).filter(([x])=>x.at(-1)>x[0]&&x[0]<=lo&&x.at(-1)>=hi).at(-1);
     const keep=sx.map((x,i)=>i===0||x>sx[i-1]),xx=sx.filter((_,i)=>keep[i]),yy=sy.filter((_,i)=>keep[i]);
-    const px=[lo,...xx.filter(x=>x>lo&&x<hi),hi],baseline=result.baseline_mA_cm2;
-    // The shaded polygon is the same positive, baseline-subtracted area used by the core.
-    const py=px.map(x=>Math.max(baseline,ECAnalysis.interp(xx,yy,x,Infinity)));
+    const baseline=result.baseline_mA_cm2;
+    const region=ECAnalysis.hupdRegion(xx,yy,lo,hi,baseline);
     lastFullCycle={X,Y};lastAnodicSweep=[xx,yy];ecsaResult=result;
     const SH=result.SH_mA_V_cm2,QH=SH/v,area=QH*A/q;
     $('o_SH').textContent=fmt(SH,5);$('o_QH').textContent=fmt(QH,4);
     $('o_ecsa').textContent=fmt(result.ecsa_m2_g,2);$('o_ecsa_cm2').textContent=fmt(area,3);$('o_rf').textContent=fmt(area/A,2);
     $('cvMsg').textContent=`S_H = ${SH.toFixed(5)} mA·V/cm²; baseline = ${baseline.toFixed(5)} mA/cm²; ${$('baselineMode').value==='manual'?'manual / 手动':`j@${hi.toFixed(3)} V / 积分上限基线`}.`;
-    drawCvPlots(lo,hi,px,py,baseline);
+    drawCvPlots(lo,hi,region,baseline);
   }catch(e){$('cvMsg').textContent=e.message;}
   finally{calcORR();}
 }
 
 /* ===== Plotting ===== */
-function drawCvPlots(lo, hi, px, py, j_bg){
+function drawCvPlots(lo, hi, region, j_bg){
   if (!lastFullCycle){
     $("cvPlotFull").innerHTML = "";
     $("cvPlotZoom").innerHTML = "";
@@ -2020,14 +2049,18 @@ function drawCvPlots(lo, hi, px, py, j_bg){
     title: "CV", xlabel: "E (V vs RHE)", ylabel: "J (mA/cm\u00B2)",
     regions: [{ x0: lo, x1: hi, color: "#0071e3" }]
   });
-  lastCvZoom = { px, py, j_bg };
-  const baselineY = px.map(() => j_bg);
+  lastCvZoom = { region, j_bg };
+  drawCvZoom();
+}
+function drawCvZoom(){
+  const {region,j_bg}=lastCvZoom;
+  const px=region.x, baselineY=px.map(() => j_bg);
   svgChart($("cvPlotZoom"), [
-    { x: px, y: py, color: "#0071e3" },
-    { x: px, y: baselineY, color: "#d70015", dashed: true }
+    { x: px, y: region.current, color: "#0071e3", name: "Measured anodic sweep" },
+    { x: px, y: baselineY, color: "#d70015", dashed: true, name: "Baseline" }
   ], Object.assign({
-    title: "Hupd Peak \u00B7 Baseline-subtracted Area", xlabel: "E (V vs RHE)", ylabel: "J (mA/cm\u00B2)",
-    fills: [{ x: px, y: py, base: baselineY, color: "#00875a" }]
+    title: "Hupd desorption \u00B7 Positive area above baseline", xlabel: "E (V vs RHE)", ylabel: "J (mA/cm\u00B2)",
+    fills: [{ x: px, y: region.upper, base: baselineY, color: "#00875a" }]
   }, cvXOpt()));
 }
 
@@ -2137,15 +2170,13 @@ $("cvClear").addEventListener("click", () => {
   $("cvPlotFull").innerHTML = ""; $("cvPlotZoom").innerHTML = "";
   updateSummary();
 });
-$("lsvClear").addEventListener("click", () => {
-  lsvResult=null; lastLsvX=null; lastLsvY=null; $("lsvPlot").replaceChildren();
-  $("lsvText").value = ""; $("n2Text").value = "";
-  $("jE").value = ""; $("jlim").value = "";
-  $("lsvMsg").textContent = "Cleared.";
-  $("lsvPlot").style.display = "none";
-  ["o_jk","o_ma","o_sa"].forEach(id => $(id).textContent = "\u2014");
-  updateSummary();
-});
+function clearLsvInput(id, message){
+  $(id).value = "";
+  invalidateLsv();
+  $("lsvMsg").textContent = message;
+}
+$("lsvClear").addEventListener("click", () => clearLsvInput("lsvText", "O₂ LSV cleared. · 已清空 O₂ LSV。"));
+$("n2Clear").addEventListener("click", () => clearLsvInput("n2Text", "N₂ background cleared. · 已清空 N₂ 背景。"));
 
 
 
@@ -2161,15 +2192,7 @@ function cvXOpt(){
 }
 $("cvApplyX").addEventListener("click", () => {
   if (!lastCvZoom){ alert("Please generate the Hupd plot first."); return; }
-  const { px, py, j_bg } = lastCvZoom;
-  const baselineY = px.map(() => j_bg);
-  svgChart($("cvPlotZoom"), [
-    { x: px, y: py, color: "#0071e3" },
-    { x: px, y: baselineY, color: "#d70015", dashed: true }
-  ], Object.assign({
-    title: "Hupd Peak \u00B7 Baseline-subtracted Area", xlabel: "E (V vs RHE)", ylabel: "J (mA/cm\u00B2)",
-    fills: [{ x: px, y: py, base: baselineY, color: "#00875a" }]
-  }, cvXOpt()));
+  drawCvZoom();
 });
 
 /* ===== LSV Y-axis manual control ===== */
@@ -2331,7 +2354,7 @@ document.querySelector('.frac-tag[data-f="30"]').classList.add("active");
   function nextName(){let n=1;while(samples.some(s=>s.sample_id===`Sample-${n}`))n++;$('wbName').value=`Sample-${n}`;}
   function restoreInputs(sample){
     if(!sample.input_state){$('wbMessage').textContent=T('This imported sample has no original input form; its curves remain available for comparison.','此导入样品没有原始输入表单；仍可参与曲线比较。');return;}
-    $('cvClear').click();$('lsvClear').click();
+    $('cvClear').click();$('lsvClear').click();$('n2Clear').click();
     for(const id of inputIds)if(Object.hasOwn(sample.input_state,id))$(id).value=sample.input_state[id];
     $('wbName').value=sample.sample_id;computePtLoad();
     if($('cvText').value.trim())calcECSA();if($('lsvText').value.trim())$('lsvBtn').click();
@@ -2453,12 +2476,15 @@ document.querySelector('.frac-tag[data-f="30"]').classList.add("active");
     const els=[];if($('wbExportCv').checked)els.push($('wbCvPlot'));if($('wbExportLsv').checked)els.push($('wbOrrPlot'));
     exportPNGCombined(els,'comparison.png');
   };
-  function demoSample(id,center){
+  function demoSample(id,center,scale){
     const E=Array.from({length:201},(_,i)=>0.2+i*0.004),j=E.map(e=>-6/(1+Math.exp((e-center)/0.025)));
-    const ce=[],cj=[];for(let cycle=0;cycle<3;cycle++){for(let i=0;i<100;i++){const e=i/100;ce.push(e);cj.push(0.08+0.7*Math.exp(-(((e-0.18)/0.07)**2)));}for(let i=100;i>0;i--){ce.push(i/100);cj.push(-0.08);}}ce.push(0);cj.push(0.08);
+    const peak=(e,c,w)=>Math.exp(-(((e-c)/w)**2));
+    const up=e=>0.05+scale*(0.34*peak(e,.13,.045)+0.24*peak(e,.24,.065)+0.10/(1+Math.exp(-(e-.91)/.03)));
+    const down=e=>-0.05-scale*(0.30*peak(e,.12,.05)+0.21*peak(e,.23,.065)+0.20*peak(e,.74,.075));
+    const ce=[],cj=[];for(let cycle=0;cycle<3;cycle++){for(let i=0;i<100;i++){const e=i/100;ce.push(e);cj.push(up(e));}for(let i=100;i>0;i--){const e=i/100;ce.push(e);cj.push(down(e));}}ce.push(0);cj.push(up(0));
     return {sample_id:id,orr:{E,j},n2:{E,j:E.map(()=>0)},cv:{E:ce,j:cj,scan_rate_V_s:0.02},loading_mg_cm2:0.02,metadata:{synthetic:true}};
   }
-  $('wbDemo').onclick=guarded(()=>{let suffix=1;while(samples.some(s=>s.sample_id===`Demo-Pt-${suffix}`||s.sample_id===`Demo-PtCo-${suffix}`))suffix++;commit([...samples,demoSample(`Demo-Pt-${suffix}`,0.85),demoSample(`Demo-PtCo-${suffix}`,0.87)]);});
+  $('wbDemo').onclick=guarded(()=>{let suffix=1;while(samples.some(s=>s.sample_id===`Demo-Pt-${suffix}`||s.sample_id===`Demo-PtCo-${suffix}`))suffix++;commit([...samples,demoSample(`Demo-Pt-${suffix}`,0.85,1),demoSample(`Demo-PtCo-${suffix}`,0.87,.8)]);});
   try{
     const saved=JSON.parse(localStorage.getItem(historyKey)||'null');
     if(saved){if(saved.history_version!==1||!Array.isArray(saved.samples))throw Error('Unsupported history');commit(saved.samples,new Set(saved.selected||saved.samples.map(s=>s.sample_id)),false);nextName();}
@@ -2492,7 +2518,9 @@ document.querySelector('.frac-tag[data-f="30"]').classList.add("active");
 /* Offline bilingual UI layer. English source text remains canonical; switch is reversible. */
 (() => {
   const exact = new Map([
-    ['Test Standard','测试标准'],
+    ['Import Autolab NOVA PAAX','导入 Autolab NOVA PAAX'],['PAAX file','PAAX 文件'],['Select PAAX trace','选择 PAAX 曲线'],['Load into CV','导入 CV'],['Load into O₂ LSV','导入 O₂ LSV'],['Load into N₂ Background','导入 N₂ 背景'],
+    ['Read PAAX files directly, select a potential/current trace, then load it into CV, O₂ LSV or N₂ background. Imported values use V and A. Confirm scan rate, reference and loading before calculation.','直接读取 PAAX，选择电位/电流曲线后导入 CV、O₂ LSV 或 N₂ 背景；导入值使用 V 和 A。计算前请确认扫描速率、参比和载量。'],
+    ['Method note','方法说明'],
     ['Electrochemical Surface Area (ECSA · Hupd Method)','电化学活性表面积（ECSA · Hupd 法）'],
     ['Scan Rate','扫描速率'],['Pt Monolayer Charge q','Pt 单层氢吸附电荷 q'],['RDE Geometric Area (cm²)','RDE 几何面积 (cm²)'],
     ['Ink Concentration (mg/mL)','墨水浓度 (mg/mL)'],['Drop Volume (µL)','滴涂体积 (µL)'],['Pt Weight Fraction (%)','Pt 质量分数 (%)'],['→ Pt Loading (µg/cm²)','→ Pt 载量 (µg/cm²)'],
@@ -2504,7 +2532,7 @@ document.querySelector('.frac-tag[data-f="30"]').classList.add("active");
     ['PNG transparent background (applies to CV & LSV exports)','PNG 透明背景（适用于 CV 与 LSV 导出）'],['Hupd plot X-axis range (V):','Hupd 图 X 轴范围 (V)：'],['Min','最小'],['Max','最大'],['Apply X-axis','应用 X 轴'],
     ['ORR Mass Activity / Specific Activity','ORR 质量活性 / 比活性'],['Current Density j @ E (mA/cm²)','指定电位下电流密度 j (mA/cm²)'],['Evaluation Potential E (V vs RHE)','评价电位 E (V vs RHE)'],
     ['Auto diffusion plateau (recommended)','自动扩散平台（推荐）'],['Manual potential (legacy)','手动电位（兼容模式）'],['Evaluation Potential (V)','评价电位 (V)'],
-    ['Correct & Extract','校正并提取'],['Download LSV Plot','下载 LSV 图'],['Clear LSV','清空 LSV'],['Y-axis range (mA/cm²):','Y 轴范围 (mA/cm²)：'],['Apply Y-axis','应用 Y 轴'],
+    ['Correct & Extract','校正并提取'],['Download LSV Plot','下载 LSV 图'],['Clear O₂ LSV','清空 O₂ LSV'],['Clear N₂ Background','清空 N₂ 背景'],['Y-axis range (mA/cm²):','Y 轴范围 (mA/cm²)：'],['Apply Y-axis','应用 Y 轴'],
     ['Results Summary','结果汇总'],['Export CSV','导出 CSV'],['Export Summary (16:9)','导出汇总图 (16:9)'],
     ['Analysis Workbench · 自动 QC / 多样品比较','分析工作台 · 自动 QC / 多样品比较'],['Sample ID','样品 ID'],['Input potential reference','输入电位参比'],
     ['Additional uncompensated Ru (Ω)','附加未补偿 Ru (Ω)'],['Minimum plateau width (V)','最小平台宽度 (V)'],['Plateau slope / amplitude (V⁻¹)','平台斜率 / 幅值 (V⁻¹)'],
@@ -2538,7 +2566,7 @@ document.querySelector('.frac-tag[data-f="30"]').classList.add("active");
   exact.set("Multi-rpm Koutecký–Levich · 多转速拟合","多转速拟合");
   const phrases = [
     ['Hupd background subtraction · ECSA · ORR mass/specific activity · Offline calculation','Hupd 背景扣除 · ECSA · ORR 质量/比活性 · 离线计算'],
-    ['Based on GB/T 20042.4-2025. Methods are compatible with US DOE and EU JRC/IEC protocols (Hupd ECSA, K-L kinetic current, q = 0.21 mC/cm²).','基于 GB/T 20042.4-2025；方法兼容美国 DOE 与欧盟 JRC/IEC 常用流程（Hupd ECSA、K-L 动力学电流，q = 0.21 mC/cm²）。'],
+    ['Hupd ECSA and K-L kinetic current; the default Pt charge density is 0.21 mC/cm². Check the baseline and experimental protocol for your data.','采用 Hupd ECSA 和 K-L 动力学电流；默认 Pt 电荷密度为 0.21 mC/cm²。请根据实际数据检查基线和实验流程。'],
     ['Capture the current CV/O₂/N₂ inputs, or import sample JSON files. Each capture is a snapshot; recapture after changing inputs. Analysis uses cathodic currents and a continuous diffusion plateau. Missing results are shown as —.','可捕获当前 CV/O₂/N₂ 输入，或导入样品 JSON。每次捕获都是快照，修改输入后需重新捕获。分析采用阴极电流与连续扩散平台；缺失结果显示为 —。'],
     ['RHE conversion and E − I·Ru apply only to captured workbench data. Use Ru = 0 if already corrected. Hupd bounds above are interpreted in V vs RHE here. Original manual calculators remain available.','RHE 换算与 E − I·Ru 仅作用于工作台捕获的数据；若数据已校正，请设 Ru = 0。此处 Hupd 范围按 V vs RHE 解释；原手动计算器仍保留。'],
     ['Paste/import CSV: rpm,potential_V_RHE,j_mA_cm2. Supply a single corrected ORR sweep per rpm, at least three distinct speeds. Values must already be in V vs RHE and mA/cm²; no background or potential correction is applied here.','粘贴/导入 CSV：rpm,potential_V_RHE,j_mA_cm2。每个转速提供一条已校正 ORR 扫描，至少三个不同转速。数据必须已为 V vs RHE 与 mA/cm²；此处不再做背景或电位校正。'],
@@ -2596,5 +2624,104 @@ document.querySelector('.frac-tag[data-f="30"]').classList.add("active");
 
 </script>
 <!-- I18N SCRIPT END -->
+<!-- PAAX SCRIPT START -->
+<script>
+/* Autolab NOVA PAAX import, embedded in the standalone offline workbench. */
+(() => {
+  const byId=id=>document.getElementById(id);
+  const T=(en,zh)=>window.uiT?window.uiT(en,zh):en+' · '+zh;
+  const unitScale={V:1,mV:1e-3,uV:1e-6,'µV':1e-6,'μV':1e-6,A:1,mA:1e-3,uA:1e-6,'µA':1e-6,'μA':1e-6,nA:1e-9};
+  const child=(node,name)=>Array.from(node.children).find(n=>n.localName===name);
+  function numbers(node){
+    if(!node)throw Error('Missing X_data or Y_data');
+    const text=node.textContent.trim();if(!text)return [];
+    const tokens=text.split(',');
+    if(tokens.some(t=>!t.trim()||!Number.isFinite(Number(t))))throw Error('Non-numeric or empty data value');
+    return tokens.map(Number);
+  }
+  function unit(node,axis,kind){
+    const value=child(node,axis+'_unit')?.textContent.trim()||node?.getAttribute('unit')||node?.getAttribute('symbol');
+    if(!value)return kind==='potential'?'V':kind==='current'?'A':'?';
+    return value;
+  }
+  function parse(xml){
+    if(/<!DOCTYPE|<!ENTITY/i.test(xml))throw Error('Unsupported XML declaration');
+    const doc=new DOMParser().parseFromString(xml,'application/xml');
+    if(doc.getElementsByTagName('parsererror').length)throw Error('Invalid PAAX XML');
+    const nodes=Array.from(doc.getElementsByTagName('DAB_node')).filter(n=>n.getAttribute('type')==='trace');
+    if(!nodes.length)throw Error('No PAAX traces found');
+    const used=new Set();
+    return nodes.map((node,index)=>{
+      const encoded=child(node,'name')?.textContent||`trace_${index}`;
+      let base;try{base=decodeURIComponent(encoded);}catch{base=encoded;}
+      let name=base,n=2;while(used.has(name))name=`${base} (${n++})`;used.add(name);
+      const xu=child(node,'X_units'),yu=child(node,'Y_units');
+      const xkind=xu?.getAttribute('qty_kind')||'?',ykind=yu?.getAttribute('qty_kind')||'?';
+      const xunit=unit(xu,'X',xkind),yunit=unit(yu,'Y',ykind);
+      const trace={name,xkind,ykind,xunit,yunit,X:[],Y:[],error:null};
+      try{
+        const blocks=Array.from(node.getElementsByTagName('points')).filter(p=>p.closest('DAB_node[type="trace"]')===node);
+        for(const block of blocks){
+          const X=numbers(child(block,'X_data')),Y=numbers(child(block,'Y_data'));
+          if(X.length!==Y.length)throw Error('X/Y point counts differ');
+          const quantity=block.getAttribute('quantity');
+          if(quantity!==null&&(!/^\d+$/.test(quantity)||Number(quantity)!==X.length))throw Error('Declared point count differs from data');
+          for(let i=0;i<X.length;i++){trace.X.push(X[i]);trace.Y.push(Y[i]);}
+        }
+        if(trace.X.length<2)throw Error('Fewer than two points');
+        if(xkind!=='potential'||ykind!=='current')throw Error('Not a potential/current trace');
+        if(!['V','mV','uV','µV','μV'].includes(xunit)||!['A','mA','uA','µA','μA','nA'].includes(yunit))throw Error('Unsupported potential/current units');
+      }catch(e){trace.error=e.message;}
+      return trace;
+    });
+  }
+  window.PAAX={parse};
+  let traces=[],request=0;
+  const buttons=['paaxCv','paaxO2','paaxN2'];
+  function selected(){return traces[Number(byId('paaxTrace').value)];}
+  function update(){buttons.forEach(id=>byId(id).disabled=!selected()||!!selected().error);}
+  byId('paaxFile').onchange=async()=>{
+    const ticket=++request;traces=[];byId('paaxTrace').replaceChildren();byId('paaxTable').replaceChildren();update();
+    const file=byId('paaxFile').files[0];if(!file)return;
+    byId('paaxMessage').textContent=T('Reading PAAX…','正在读取 PAAX…');
+    try{
+      const xml=await file.text();if(ticket!==request)return;
+      traces=parse(xml);
+      const head=document.createElement('tr');
+      ['Trace · 曲线','X / Y','Points · 点数','Status · 状态'].forEach(v=>{const cell=document.createElement('th');cell.textContent=v;head.append(cell);});byId('paaxTable').append(head);
+      traces.forEach((t,i)=>{
+        const option=document.createElement('option');option.value=i;option.textContent=`${t.name} — ${t.X.length} points (${t.xunit}, ${t.yunit})${t.error?' — unavailable':''}`;option.disabled=!!t.error;byId('paaxTrace').append(option);
+        const row=document.createElement('tr');[t.name,`${t.xkind} (${t.xunit}) / ${t.ykind} (${t.yunit})`,t.X.length,t.error||'Ready · 可导入'].forEach(v=>{const cell=document.createElement('td');cell.textContent=v;row.append(cell);});byId('paaxTable').append(row);
+      });
+      const first=traces.findIndex(t=>!t.error);byId('paaxTrace').value=first<0?'':String(first);update();
+      byId('paaxMessage').textContent=`${file.name}: ${traces.filter(t=>!t.error).length}/${traces.length} usable traces · 可用曲线。`;
+    }catch(e){if(ticket!==request)return;byId('paaxMessage').textContent=T('PAAX import failed: ','PAAX 导入失败：')+e.message;}
+  };
+  byId('paaxTrace').onchange=update;
+  function apply(target){
+    const t=selected();if(!t||t.error)return;
+    const input={cv:'cvText',o2:'lsvText',n2:'n2Text'}[target];
+    const xs=unitScale[t.xunit],ys=unitScale[t.yunit];
+    const data=t.X.map((x,i)=>`${x*xs},${t.Y[i]*ys}`).join('\n');
+    if(target==='cv'){byId('cvPotUnit').value='V';byId('cvCurUnit').value='A';}
+    else {
+      // O₂ and N₂ share the potential-unit setting; preserve the other raw input in volts.
+      const other=byId(target==='o2'?'n2Text':'lsvText');
+      if(other.value.trim()&&byId('o2PotUnit').value!=='V'){
+        const currentUnit=byId(target==='o2'?'n2CurUnit':'o2CurUnit').value;
+        const rows=parse2col(other.value,byId('o2PotUnit').value,currentUnit);
+        const factor=unitScale[currentUnit];
+        other.value=rows.map(r=>`${r[0]},${r[1]/factor}`).join('\n');
+      }
+      byId('o2PotUnit').value='V';byId(target==='o2'?'o2CurUnit':'n2CurUnit').value='A';
+    }
+    byId(input).value=data;byId(input).dispatchEvent(new Event('input',{bubbles:true}));
+    byId('paaxMessage').textContent=T('Loaded ','已导入 ')+t.name+` → ${target.toUpperCase()} (${t.X.length} points; V, A).`;
+  }
+  for(const [button,target] of [['paaxCv','cv'],['paaxO2','o2'],['paaxN2','n2']])byId(button).onclick=()=>{try{apply(target);}catch(e){byId('paaxMessage').textContent=e.message;}};
+})();
+
+</script>
+<!-- PAAX SCRIPT END -->
 </body>
 </html>
