@@ -34,6 +34,28 @@ def kl_data():
 
 
 class AnalysisTests(unittest.TestCase):
+    def test_sloped_baseline_crossings_and_browser_parity(self):
+        cv=dict(E=[0,.1,.2],j=[-1,1.1,-.8],hupd_range_V=[0,.2],
+                baseline_endpoints_mA_cm2=[0,.2],scan_rate_V_s=.02)
+        result=cv_analysis(cv,.02)
+        # Relative to j_baseline=E the signal is [-1,1,-1]: a triangle
+        # from .05 to .15 V with height 1 mA/cm² and area .05.
+        self.assertAlmostEqual(result["SH_mA_V_cm2"],.05)
+        self.assertEqual(result["baseline_endpoints_mA_cm2"],[0,.2])
+        self.assertEqual(result["baseline_mA_cm2"],.2)
+        program="const a=require('./web/analysis.js');console.log(JSON.stringify(a.cvAnalysis(JSON.parse(process.argv[1]),.02)))"
+        js=json.loads(subprocess.run(["node","-e",program,json.dumps(cv)],capture_output=True,text=True,cwd=ROOT,check=True).stdout)
+        self.assertAlmostEqual(js["SH_mA_V_cm2"],result["SH_mA_V_cm2"])
+        self.assertAlmostEqual(js["ecsa_m2_g"],result["ecsa_m2_g"])
+        self.assertEqual(js["baseline_endpoints_mA_cm2"],result["baseline_endpoints_mA_cm2"])
+        horizontal={**cv,"baseline_endpoints_mA_cm2":[0,0]}
+        self.assertAlmostEqual(cv_analysis(horizontal,.02)["SH_mA_V_cm2"],cv_analysis({k:v for k,v in {**cv,"baseline_mA_cm2":0}.items() if k!="baseline_endpoints_mA_cm2"},.02)["SH_mA_V_cm2"])
+        for bad in [0, [0], [0,float('nan')], [0,.1,.2]]:
+            with self.assertRaises(ValueError):
+                cv_analysis({**cv,"baseline_endpoints_mA_cm2":bad},.02)
+        with self.assertRaises(ValueError):
+            cv_analysis({**cv,"baseline_mA_cm2":0},.02)
+
     def test_hupd_crossings_and_units(self):
         cv=dict(E=[0,.1,.2,.3,.4],j=[-1,1,-1,1,-1],
                 hupd_range_V=[0,.4],baseline_mA_cm2=0,scan_rate_V_s=.02)

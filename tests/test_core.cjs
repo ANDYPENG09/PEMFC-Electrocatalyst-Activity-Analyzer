@@ -21,6 +21,13 @@ assert(Math.abs(region.area-.1)<1e-12);
 assert.equal(region.current[0],-1);
 assert.equal(region.upper[0],0);
 assert(region.x.some(x=>Math.abs(x-.05)<1e-12));
+const sloped=a.hupdRegion([0,.1,.2],[-1,1.1,-.8],0,.2,[0,.2]);
+assert(Math.abs(sloped.area-.05)<1e-12);
+assert(sloped.x.some(x=>Math.abs(x-.05)<1e-12));
+assert(sloped.x.some(x=>Math.abs(x-.15)<1e-12));
+assert.equal(sloped.baseline[0],0);assert(Math.abs(sloped.baseline.at(-1)-.2)<1e-12);
+assert.throws(()=>a.hupdRegion([0,.1,.2],[-1,1.1,-.8],0,.2,[0,NaN]));
+assert.throws(()=>a.cvAnalysis({E:[0,.1,.2],j:[-1,1.1,-.8],hupd_range_V:[0,.2],baseline_mA_cm2:0,baseline_endpoints_mA_cm2:[0,.2]},.02));
 // Large curves should not hit the engine's argument-count limit.
 const E=Array.from({length:150000},(_,i)=>i/149999),j=E.map(e=>-6/(1+Math.exp((e-.85)/.025)));
 assert(a.plateau(E,j));

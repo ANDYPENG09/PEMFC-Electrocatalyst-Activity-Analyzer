@@ -133,26 +133,41 @@ def sweeps(E, j):
 
 
 def hupd_region(x, y, lo, hi, baseline):
-    """Piecewise-linear anodic data with exact baseline crossings inserted."""
+    """Positive area over a horizontal or linearly sloped baseline.
+
+    A two-element baseline specifies current density at the two integration
+    limits. Insert exact crossings of the piecewise-linear curve and baseline.
+    """
+    base = np.asarray(baseline, dtype=float)
+    if base.ndim == 0:
+        base = np.repeat(base, 2)
+    if base.shape != (2,) or not np.isfinite(base).all():
+        raise ValueError("CV baseline requires one value or two finite endpoint values")
+    def baseline_at(potential):
+        return base[0] + (base[1] - base[0]) * (potential - lo) / (hi - lo)
     knots = np.r_[lo, x[(x > lo) & (x < hi)], hi]
     values = np.interp(knots, x, y)
     xx, yy = [], []
     for i, (potential, current) in enumerate(zip(knots, values)):
         if i:
-            previous, following = yy[-1] - baseline, current - baseline
+            previous = yy[-1] - baseline_at(xx[-1])
+            following = current - baseline_at(potential)
             if previous * following < 0:
-                xx.append(xx[-1] + (potential - xx[-1]) * (-previous) / (following - previous))
-                yy.append(baseline)
+                crossing = xx[-1] + (potential - xx[-1]) * (-previous) / (following - previous)
+                xx.append(crossing)
+                yy.append(baseline_at(crossing))
         xx.append(float(potential))
         yy.append(float(current))
     xx, yy = np.asarray(xx), np.asarray(yy)
-    upper = np.maximum(baseline, yy)
-    area = float(np.sum(np.diff(xx) * (upper[1:] + upper[:-1] - 2*baseline) / 2))
+    background = baseline_at(xx)
+    upper = np.maximum(background, yy)
+    delta = upper - background
+    area = float(np.sum(np.diff(xx) * (delta[1:] + delta[:-1]) / 2))
     return xx, yy, upper, area
 
 
 def cv_analysis(cv, loading):
-    """Last complete anodic Hupd peak, endpoint baseline; compare like-direction scans."""
+    """Last complete anodic Hupd sweep; compare like-direction scans."""
     if not cv:
         return dict(ecsa_m2_g=None, stability_fraction=None, anodic_sweeps=0)
     lo, hi = cv.get("hupd_range_V", [0.05, 0.4])
@@ -165,10 +180,16 @@ def cv_analysis(cv, loading):
     # Remove potential holds within a CV branch; never average opposite branches.
     branches = [(x[np.r_[True, np.diff(x)>0]], y[np.r_[True, np.diff(x)>0]]) for x,y in branches]
     x,y = branches[-1]
-    baseline = cv.get("baseline_mA_cm2", float(np.interp(hi,x,y)))
-    if not np.isfinite(baseline):
-        raise ValueError("CV baseline must be finite")
+    if "baseline_endpoints_mA_cm2" in cv and "baseline_mA_cm2" in cv:
+        raise ValueError("Specify one CV baseline, not both horizontal and sloped")
+    baseline = cv.get("baseline_endpoints_mA_cm2", cv.get("baseline_mA_cm2", float(np.interp(hi,x,y))))
+    if ("baseline_endpoints_mA_cm2" in cv and np.asarray(baseline).shape != (2,)) or (
+            "baseline_mA_cm2" in cv and np.asarray(baseline).ndim != 0):
+        raise ValueError("CV baseline must match the selected mode")
     _, _, _, sh = hupd_region(x, y, lo, hi, baseline)
+    endpoints = np.asarray(baseline, dtype=float)
+    if endpoints.ndim == 0:
+        endpoints = np.repeat(endpoints, 2)
     stability = None
     if len(branches) >= 2:
         a,b = branches[-2:]
@@ -178,7 +199,8 @@ def cv_analysis(cv, loading):
         stability = float(np.sqrt(np.mean((ya-yb)**2))/scale)
     return dict(ecsa_m2_g=100*sh/(q*rate*loading*1000) if loading and sh > 0 else None,
                 stability_fraction=stability, anodic_sweeps=len(branches),
-                SH_mA_V_cm2=sh, baseline_mA_cm2=baseline)
+                SH_mA_V_cm2=sh, baseline_mA_cm2=float(endpoints[1]),
+                baseline_endpoints_mA_cm2=endpoints.tolist())
 
 
 def fit_line(x, y):
