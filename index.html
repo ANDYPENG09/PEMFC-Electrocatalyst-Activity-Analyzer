@@ -929,7 +929,7 @@ function drawCvZoom(){
   const {region,j_bg}=lastCvZoom;
   const px=region.x, baselineY=px.map(() => j_bg);
   svgChart($("cvPlotZoom"), [
-    { x: px, y: region.current, color: "#0071e3", name: "Measured anodic sweep" },
+    { x: px, y: region.current, color: "#0071e3", name: "Input anodic sweep" },
     { x: px, y: baselineY, color: "#d70015", dashed: true, name: "Baseline" }
   ], Object.assign({
     title: "Hupd desorption \u00B7 Positive area above baseline", xlabel: "E (V vs RHE)", ylabel: "J (mA/cm\u00B2)",
