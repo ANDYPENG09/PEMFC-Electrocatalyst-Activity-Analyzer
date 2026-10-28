@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased — restore anonymized example
+
+Restore the original anonymized CV, N₂ and O₂ example data under the generic sample name Example. The ECSA illustration uses that same CV and calculation; the separate two-sample comparison remains synthetic.
+
 ## Unreleased — example curve shape and provenance
 
 - Redraw the synthetic CV example over 0.025–1.2 V with continuous scan reversals, a hydrogen-desorption peak and shoulder, hydrogen adsorption, Pt oxidation and broad Pt-oxide reduction. These are illustrative, not experimental curves.

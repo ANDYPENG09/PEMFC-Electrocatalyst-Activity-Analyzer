@@ -9,6 +9,9 @@ def build(check=False):
     path=ROOT/"index.html"
     old=path.read_text(encoding="utf-8")
     html=(ROOT/"web/workbench.html").read_text(encoding="utf-8").strip()
+    example_text=(ROOT/"web/example.json").read_text(encoding="utf-8").strip()
+    if "</script" in example_text.lower(): raise ValueError("Unsafe example data")
+    example="<!-- EXAMPLE DATA START -->\n<script type=\"application/json\" id=\"example-data\">\n"+example_text+"\n</script>\n<!-- EXAMPLE DATA END -->"
     core="<!-- ANALYSIS CORE START -->\n<script>\n"+(ROOT/"web/analysis.js").read_text(encoding="utf-8")+"\n</script>\n<!-- ANALYSIS CORE END -->"
     demo="<!-- DEMO SCRIPT START -->\n<script>\n"+(ROOT/"web/demo.js").read_text(encoding="utf-8")+"\n</script>\n<!-- DEMO SCRIPT END -->"
     lang="<!-- I18N SCRIPT START -->\n<script>\n"+(ROOT/"web/i18n.js").read_text(encoding="utf-8")+"\n</script>\n<!-- I18N SCRIPT END -->"
@@ -16,6 +19,7 @@ def build(check=False):
     paax="<!-- PAAX SCRIPT START -->\n<script>\n"+(ROOT/"web/paax.js").read_text(encoding="utf-8")+"\n</script>\n<!-- PAAX SCRIPT END -->"
     new=old
     for start,end,content,anchor in [("WORKBENCH START","WORKBENCH END",html,"<footer>"),
+                                     ("EXAMPLE DATA START","EXAMPLE DATA END",example,"<!-- DEMO SCRIPT START -->"),
                                      ("ANALYSIS CORE START","ANALYSIS CORE END",core,"<script>"),
                                      ("DEMO SCRIPT START","DEMO SCRIPT END",demo,"<!-- ANALYSIS CORE START -->"),
                                      ("I18N SCRIPT START","I18N SCRIPT END",lang,"</body>"),
