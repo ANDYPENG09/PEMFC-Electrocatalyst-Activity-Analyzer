@@ -23,7 +23,7 @@ const tick=()=>new Promise(r=>setTimeout(r,20));
  const el=id=>d.getElementById(id),click=id=>el(id).click();
  assert.equal(el('lsvData').open,true);
  // PAAX parsing: bundled file, multiple blocks, duplicate names, invalid arrays and units.
- const paax=fs.readFileSync('sample_data/Example.paax','utf8');
+ const paax=fs.readFileSync('sample_data/synthetic-demo.paax','utf8');
  const parsed=w.PAAX.parse(paax);assert(parsed.length>=3);assert(parsed.every(t=>!t.error));
  Object.defineProperty(el('paaxFile'),'files',{configurable:true,value:[{name:'demo.paax',text:async()=>paax}]});
  el('paaxFile').dispatchEvent(new w.Event('change'));await tick();
@@ -48,11 +48,11 @@ const tick=()=>new Promise(r=>setTimeout(r,20));
 
  click('wbDemo');await tick();assert.equal(el('wbTable').rows.length,3);
  assert.equal(el('wbCvPlot').querySelectorAll('polyline').length,2);
- assert(el('wbCvPlot').textContent.includes('Demo-Pt-1'));
+ assert(el('wbCvPlot').textContent.includes('Demo-A-1'));
  // Selection controls update both plots and download selection, preserve after refresh.
- let pick=d.querySelector('[aria-label="Compare Demo-Pt-1"]');pick.click();await tick();
+ let pick=d.querySelector('[aria-label="Compare Demo-A-1"]');pick.click();await tick();
  assert.equal(el('wbCvPlot').querySelectorAll('polyline').length,1);
- let name=d.querySelector('[aria-label="Sample name Demo-PtCo-1"]');name.value='PtCo <A&B>';
+ let name=d.querySelector('[aria-label="Sample name Demo-B-1"]');name.value='PtCo <A&B>';
  name.parentElement.querySelector('button').click();await tick();
  assert(el('wbCvPlot').textContent.includes('PtCo <A&B>'));
  assert.equal(el('wbCvPlot').querySelectorAll('a,script').length,0);
@@ -74,12 +74,12 @@ const tick=()=>new Promise(r=>setTimeout(r,20));
  el('exportLayout').value='wide';el('exportHupd').checked=true;el('exportMetrics').checked=true;el('exportAnnotations').checked=true;
  click('summaryPng');await tick();assert.equal(canvases.at(-1).width,1920);assert.equal(canvases.at(-1).height,1080);
  // Capture, restore, backup and CV-only capture.
- el('wbName').value='Real example';click('wbCapture');await tick();
+ el('wbName').value='Synthetic example';click('wbCapture');await tick();
  assert.equal(el('wbTable').rows.length,4,el('wbMessage').textContent);
  click('cvClear');click('lsvClear');
  assert.equal(el('lsvPlot').querySelector('svg'),null);
  const old=downloads.length;click('lsvPng');await tick();assert.equal(downloads.length,old);assert(alerts.at(-1).includes('Generate'));
- const row=[...el('wbTable').rows].find(r=>r.querySelector('input[aria-label="Sample name Real example"]'));
+ const row=[...el('wbTable').rows].find(r=>r.querySelector('input[aria-label="Sample name Synthetic example"]'));
  [...row.querySelectorAll('button')].find(b=>b.textContent.includes('Restore')).click();await tick();
  assert(el('cvText').value.length>100);assert(el('lsvPlot').querySelector('svg'));
  click('lsvClear');el('wbName').value='CV only';click('wbCapture');await tick();assert.equal(el('wbTable').rows.length,5,el('wbMessage').textContent);
@@ -104,7 +104,7 @@ const tick=()=>new Promise(r=>setTimeout(r,20));
  Object.defineProperty(el('wbFiles'),'files',{configurable:true,value:[{text:async()=>backup}]});
  el('wbFiles').dispatchEvent(new w.Event('change'));await tick();
  assert.equal(el('wbTable').rows.length,9,el('wbMessage').textContent);
- assert(d.querySelector('[aria-label="Sample name Real example (2)"]'));
+ assert(d.querySelector('[aria-label="Sample name Synthetic example (2)"]'));
  // Storage quota failure is visible and does not discard the working history.
  const before=el('wbTable').rows.length;
  w.Storage.prototype.setItem=function(){throw Error('quota');};click('wbDemo');await tick();

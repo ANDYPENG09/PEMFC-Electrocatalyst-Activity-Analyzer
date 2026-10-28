@@ -12,8 +12,9 @@ matplotlib.rcParams.update({"svg.hashsalt": "pemfc-hupd-demo", "font.size": 10})
 
 
 def main():
-    a = sample("Synthetic Pt")
-    b = sample("Synthetic PtCo", .87, .8)
+    points_per_sweep = 300
+    a = sample("Synthetic A", cv_points=points_per_sweep)
+    b = sample("Synthetic B", .87, .8, cv_points=points_per_sweep)
     result = analyze_batch([a, b])
     fig = plot_comparison(result)
     fig.savefig(ROOT/"docs/example-comparison.svg", metadata={"Date": None})
@@ -25,19 +26,19 @@ def main():
     baseline = result["samples"][0]["cv"]["baseline_mA_cm2"]
     rx, measured, upper, _ = hupd_region(x, y, lo, hi, baseline)
     fig, (full, zoom) = plt.subplots(1, 2, figsize=(11, 4.2))
-    full.plot(cv["E"][:201], cv["j"][:201], color="#285e9b", lw=1.8)
+    full.plot(cv["E"][:2*points_per_sweep+1], cv["j"][:2*points_per_sweep+1], color="#285e9b", lw=1.8)
     full.fill_between(rx, baseline, upper, color="#2c9a6a", alpha=.3)
     full.axvline(lo, color="#7b8794", lw=.8, ls=":")
     full.axvline(hi, color="#7b8794", lw=.8, ls=":")
-    full.annotate("", xy=(.48,.05), xytext=(.34,.05),
+    full.annotate("", xy=(.55,.065), xytext=(.43,.055),
                   arrowprops={"arrowstyle":"->", "color":"#285e9b", "lw":1.5})
-    full.annotate("", xy=(.34,-.05), xytext=(.48,-.05),
+    full.annotate("", xy=(.43,-.055), xytext=(.55,-.055),
                   arrowprops={"arrowstyle":"->", "color":"#285e9b", "lw":1.5})
-    full.text(.14, -.43, "H adsorption", ha="center", fontsize=9)
-    full.text(.75, -.32, "Pt oxide reduction", ha="center", fontsize=9)
-    full.set(title="Synthetic Pt-like CV · one cycle",
+    full.text(.16, -.33, "H adsorption", ha="center", fontsize=9)
+    full.text(.78, -.31, "Pt oxide reduction", ha="center", fontsize=9)
+    full.set(title="Synthetic Pt/C-like CV · one cycle",
              xlabel="Potential (V vs RHE)", ylabel="Current density (mA/cm²)",
-             xlim=(0,1.02), ylim=(-.48,.52))
+             xlim=(0,1.22), ylim=(-.36,.32))
     zoom.plot(rx, measured, color="#285e9b", lw=2, label="Anodic sweep")
     zoom.axhline(baseline, color="#bb4242", ls="--", lw=1.4, label="Horizontal baseline")
     zoom.fill_between(rx, baseline, upper, color="#2c9a6a", alpha=.35,
