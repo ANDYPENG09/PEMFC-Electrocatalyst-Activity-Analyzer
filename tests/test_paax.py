@@ -13,7 +13,7 @@ class PaaxTests(unittest.TestCase):
             return read_paax(str(path))
 
     def test_bundled_demo(self):
-        result = read_paax('sample_data/EC-30-PtCo-Step1.paax')
+        result = read_paax('sample_data/synthetic-demo.paax')
         self.assertGreaterEqual(len(result), 3)
         for trace in result.values():
             self.assertEqual(trace['X'].size, trace['Y'].size)

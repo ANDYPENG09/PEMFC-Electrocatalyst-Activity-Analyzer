@@ -39,7 +39,7 @@ CV_CSV = os.path.join(SAMPLE, "CV.csv")
 CV_XCOL, CV_YCOL = "1", "C"
 
 # —— B) .paax 原始文件链路 ——
-PAAX = os.path.join(SAMPLE, "EC-30-PtCo-Step1.paax")
+PAAX = os.path.join(SAMPLE, "synthetic-demo.paax")
 
 OUT_LSV = os.path.join(HERE, "ORR_LSV.png")
 OUT_CV = os.path.join(HERE, "CV.png")
