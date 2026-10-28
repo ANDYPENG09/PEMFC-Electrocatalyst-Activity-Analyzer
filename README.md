@@ -14,11 +14,11 @@ The last complete **anodic** sweep supplies the H-desorption curve. The green ar
 
 This figure uses the same anonymized **Example** CV data as the single-sample calculator. The data are an example, not a universal catalyst fingerprint or a performance claim. The reference electrode, scan rate, loading, baseline and integration limits must be verified for each experiment.
 
-### Synthetic sample comparison
+### Example CV and ORR
 
-![Synthetic two-sample comparison](docs/example-comparison.svg)
+![Anonymized Example CV and N2-corrected ORR](docs/example-comparison.svg)
 
-*Illustration uses synthetic curves, not experimental performance claims.*
+*The ORR curve subtracts the N₂ background over the shared potential range and uses the calculator's seven-point smoothing. The separate two-sample workbench demo is synthetic.*
 
 ## Start in one minute
 
