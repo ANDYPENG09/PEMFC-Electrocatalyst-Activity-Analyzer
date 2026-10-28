@@ -1,10 +1,13 @@
-"""Rebuild the README's synthetic figures from the same analysis used by the app."""
+"""Rebuild the README's figures from the same data and analysis as the app."""
 from pathlib import Path
+import io
+import json
 import re
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from electrochem_analysis import analyze_batch, plot_comparison, sweeps, hupd_region
+import numpy as np
+from electrochem_analysis import analyze_batch, plot_comparison, sweeps, hupd_region, cv_analysis
 from tests.test_analysis import sample
 
 ROOT = Path(__file__).resolve().parent
@@ -20,25 +23,28 @@ def main():
     fig.savefig(ROOT/"docs/example-comparison.svg", metadata={"Date": None})
     plt.close(fig)
 
-    cv = a["cv"]
-    x, y = sweeps(cv["E"], cv["j"])[-2]  # final complete anodic branch
+    example = json.loads((ROOT/"web/example.json").read_text(encoding="utf-8"))
+    points = np.loadtxt(io.StringIO(example["cv"]))
+    # The example stores potential in V and current in A, as in the HTML.
+    geometric_area_cm2 = .19625
+    cv = {"E": points[:, 0], "j": points[:, 1] * 1000 / geometric_area_cm2}
     lo, hi = .05, .4
-    baseline = result["samples"][0]["cv"]["baseline_mA_cm2"]
+    branches = [(x,y) for x,y in sweeps(cv["E"],cv["j"]) if x[-1]>x[0] and x[0]<=lo and x[-1]>=hi]
+    x,y = branches[-1]
+    baseline = cv_analysis(cv, .02)["baseline_mA_cm2"]
     rx, measured, upper, _ = hupd_region(x, y, lo, hi, baseline)
     fig, (full, zoom) = plt.subplots(1, 2, figsize=(11, 4.2))
-    full.plot(cv["E"][:2*points_per_sweep+1], cv["j"][:2*points_per_sweep+1], color="#285e9b", lw=1.8)
+    full.plot(cv["E"], cv["j"], color="#285e9b", lw=1.8)
     full.fill_between(rx, baseline, upper, color="#2c9a6a", alpha=.3)
     full.axvline(lo, color="#7b8794", lw=.8, ls=":")
     full.axvline(hi, color="#7b8794", lw=.8, ls=":")
-    full.annotate("", xy=(.55,.065), xytext=(.43,.055),
+    full.annotate("", xy=(.60,.115), xytext=(.48,.085),
                   arrowprops={"arrowstyle":"->", "color":"#285e9b", "lw":1.5})
-    full.annotate("", xy=(.43,-.055), xytext=(.55,-.055),
+    full.annotate("", xy=(.45,-.13), xytext=(.57,-.18),
                   arrowprops={"arrowstyle":"->", "color":"#285e9b", "lw":1.5})
-    full.text(.16, -.33, "H adsorption", ha="center", fontsize=9)
-    full.text(.78, -.31, "Pt oxide reduction", ha="center", fontsize=9)
-    full.set(title="Synthetic Pt/C-like CV · one cycle",
-             xlabel="Potential (V vs RHE)", ylabel="Current density (mA/cm²)",
-             xlim=(0,1.22), ylim=(-.36,.32))
+    full.set(title="Example · anonymized CV",
+             xlabel="Potential (V)", ylabel="Current density (mA/cm²)",
+             xlim=(0,1.22))
     zoom.plot(rx, measured, color="#285e9b", lw=2, label="Anodic sweep")
     zoom.axhline(baseline, color="#bb4242", ls="--", lw=1.4, label="Horizontal baseline")
     zoom.fill_between(rx, baseline, upper, color="#2c9a6a", alpha=.35,
@@ -46,7 +52,7 @@ def main():
     zoom.axvline(lo, color="#7b8794", lw=.8, ls=":")
     zoom.axvline(hi, color="#7b8794", lw=.8, ls=":")
     zoom.set(title="H-upd desorption integration",
-             xlabel="Potential (V vs RHE)", ylabel="Current density (mA/cm²)",
+             xlabel="Potential (V)", ylabel="Current density (mA/cm²)",
              xlim=(.025,.425))
     zoom.legend(fontsize=8.5, loc="upper right", frameon=False)
     for ax in (full, zoom):

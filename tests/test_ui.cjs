@@ -65,7 +65,13 @@ const tick=()=>new Promise(r=>setTimeout(r,20));
  assert.equal(downloads.at(-1),'comparison.png');assert(svgExports.at(-1).includes('PtCo &lt;A&amp;B&gt;'));
  assert.equal(canvases.at(-1).height,634);
  // Legacy example still calculates and default summary includes exactly CV + LSV.
- click('loadExample');click('cvBtn');click('lsvBtn');await tick();
+ const originalExample=JSON.parse(fs.readFileSync('web/example.json','utf8'));
+ click('loadExample');
+ assert.equal(el('wbName').value,'Example');
+ assert.equal(el('cvText').value,originalExample.cv);
+ assert.equal(el('n2Text').value,originalExample.n2);
+ assert.equal(el('lsvText').value,originalExample.o2);
+ click('cvBtn');click('lsvBtn');await tick();
  assert(el('cvPlotFull').querySelector('svg'));assert(el('lsvPlot').querySelector('svg'),el('lsvMsg').textContent);
  assert(Number(el('o_ecsa').textContent)>0);
  const n=svgExports.length;click('summaryPng');await tick();assert.equal(svgExports.length-n,2);

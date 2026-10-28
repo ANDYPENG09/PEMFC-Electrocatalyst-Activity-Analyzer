@@ -19,7 +19,7 @@ A self-contained, offline electrochemistry calculator for **PEM fuel cell cataly
 ## Quick Start
 
 1. Open `index.html` in any modern browser. The file includes its scripts and works directly from disk, without a server or internet.
-2. Click **Load Example Data** to see synthetic CV and LSV demo curves, not experimental data.
+2. Click **Load Example Data** for the anonymized Example CV and O₂/N₂ data, or **Load two-sample demo** for synthetic comparison curves.
 3. Or paste your own CV data (potential V, current A) into the CV textarea.
 4. Click **Calculate ECSA** → results appear instantly with SVG charts.
 
