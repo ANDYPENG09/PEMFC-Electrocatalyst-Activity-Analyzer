@@ -49,6 +49,13 @@ class AnalysisTests(unittest.TestCase):
         old=legacy.ecsa_from_hupd([.05,.2,.4],[0,1,0],.02,area_cm2=.2,loading_ug_cm2=20)
         self.assertAlmostEqual(old["ECSA_cm2"],old["ECSA_m2_per_g"]*20*.2/100)
         self.assertAlmostEqual(old["roughness_factor"],old["ECSA_cm2"]/.2)
+        old=legacy.ecsa_from_hupd([.05,.2,.4,.4,.2,.05],[0,1,0,0,-.5,0],.02)
+        self.assertAlmostEqual(old["S_fwd_mA_V_per_cm2"],.175)
+        self.assertAlmostEqual(old["S_bwd_mA_V_per_cm2"],.0875)
+        bounded=legacy.ecsa_from_hupd([0,.1,.3,.5],[0,1,1,0],.02,e_lo=.05,e_hi=.4)
+        self.assertAlmostEqual(bounded["S_avg_mA_V_per_cm2"],.3125)
+        with self.assertRaises(ValueError):
+            legacy.ecsa_from_hupd([.1,.2,.3],[0,1,0],.02,e_lo=.05,e_hi=.4)
 
     def test_synthetic_cv_has_both_hupd_branches(self):
         e,j=synthetic_cv(lo=.05,hi=1,cycles=1)

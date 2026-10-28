@@ -114,7 +114,7 @@ These defaults are **screening heuristics, not standards certification**. `Good`
 
 The single-sample HTML and workbench use the **last complete anodic Hupd sweep**, a horizontal endpoint baseline at the upper integration bound, positive baseline-subtracted area and interpolated bounds. Where the measured line crosses the baseline, an interpolated crossing is inserted before integration. The plotted line remains the measured line; only the filled area is clipped at the baseline. This convention is identical in the JS and Python workbench cores. Use `baseline_mA_cm2` to specify a manual baseline. A horizontal baseline is an approximation and may be unsuitable for some supports or protocols.
 
-The legacy Python `ecsa_from_hupd` remains a distinct two-sweep mean method: it integrates the currents supplied and **does not subtract a baseline**. Supply separately baseline-corrected currents for each branch, or use `electrochem_analysis.cv_analysis` for automatic endpoint-baseline subtraction. Its returned Pt area and roughness factor now correctly convert mC to C; specific ECSA units were already converted separately. Results from the two methods can differ.
+The legacy Python `ecsa_from_hupd` remains a distinct two-sweep mean method: it integrates the currents supplied and **does not subtract a baseline**. Supply separately baseline-corrected currents for each branch, or use `electrochem_analysis.cv_analysis` for automatic endpoint-baseline subtraction. Its returned Pt area and roughness factor now correctly convert mC to C; specific ECSA units were already converted separately. Turning points and integration limits are now handled explicitly, and incomplete coverage is rejected. Results from the two methods can differ.
 
 ### Multi-rpm K–L import
 
