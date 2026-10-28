@@ -60,6 +60,26 @@ const ECAnalysis = (() => {
     for(let i=1;i<x.length;i++){const sign=Math.sign(x[i]-x[i-1]);if(sign&&direction&&sign!==direction){if(i-start>=3)out.push([x.slice(start,i),y.slice(start,i)]);start=i-1;}if(sign)direction=sign;}
     if(x.length-start>=3)out.push([x.slice(start),y.slice(start)]);return out;
   }
+  // Insert exact baseline crossings before clipping, so the shaded polygon and
+  // its trapezoidal area match the positive part of the measured line segments.
+  function hupdRegion(x,y,lo,hi,baseline){
+    const points=[lo,...x.filter(v=>v>lo&&v<hi),hi],px=[],current=[];
+    for(let i=0;i<points.length;i++){
+      const value=interp(x,y,points[i],Infinity);
+      if(i){
+        const previous=current.at(-1)-baseline, next=value-baseline;
+        if(previous*next<0){
+          px.push(px.at(-1)+(points[i]-px.at(-1))*(-previous)/(next-previous));
+          current.push(baseline);
+        }
+      }
+      px.push(points[i]);current.push(value);
+    }
+    const upper=current.map(v=>Math.max(baseline,v));
+    let area=0;
+    for(let i=1;i<px.length;i++)area+=(px[i]-px[i-1])*(upper[i]+upper[i-1]-2*baseline)/2;
+    return {x:px,current,upper,area};
+  }
   function cvAnalysis(cv,loading){
     const empty={ecsa_m2_g:null,stability_fraction:null,anodic_sweeps:0};if(!cv)return empty;
     const [lo,hi]=cv.hupd_range_V||[0.05,0.4],rate=cv.scan_rate_V_s??0.02,q=cv.q_mC_cm2??0.21;
@@ -68,8 +88,7 @@ const ECAnalysis = (() => {
     if(!branches.length)return empty;
     const [x,y]=branches.at(-1),baseline=cv.baseline_mA_cm2??interp(x,y,hi,Infinity);
     if(!Number.isFinite(baseline))throw Error('CV baseline must be finite');
-    const xx=[lo,...x.filter(v=>v>lo&&v<hi),hi],yy=xx.map(v=>Math.max(0,interp(x,y,v,Infinity)-baseline));
-    let sh=0;for(let i=1;i<xx.length;i++)sh+=(xx[i]-xx[i-1])*(yy[i]+yy[i-1])/2;
+    const sh=hupdRegion(x,y,lo,hi,baseline).area;
     let stability=null;
     if(branches.length>=2){const [a,b]=branches.slice(-2),l=Math.max(a[0][0],b[0][0]),h=Math.min(a[0].at(-1),b[0].at(-1)),grid=Array.from({length:101},(_,i)=>l+(h-l)*i/100),ya=grid.map(v=>interp(...a,v,Infinity)),yb=grid.map(v=>interp(...b,v,Infinity));stability=Math.sqrt(mean(ya.map((v,i)=>(v-yb[i])**2)))/Math.max(Math.sqrt(mean(yb.map(v=>v*v))),1e-12);}
     return {ecsa_m2_g:loading&&sh>0?100*sh/(q*rate*loading*1000):null,stability_fraction:stability,anodic_sweeps:branches.length,SH_mA_V_cm2:sh,baseline_mA_cm2:baseline};
@@ -138,6 +157,6 @@ const ECAnalysis = (() => {
     return rows;
   }
   function exports(analysis){return {'analysis.json':JSON.stringify(analysis,null,2),'results.csv':csv(resultFields,analysis.samples.map(s=>({sample_id:s.sample_id,...s.metrics,qc_status:s.qc.status}))),'processed_cv.csv':csv(cvFields,analysis.samples.flatMap(s=>s.processed_cv)),'processed_orr.csv':csv(orrFields,analysis.samples.flatMap(s=>s.processed_orr)),'summary.csv':csv(summaryFields,summaryRows(analysis))};}
-  return {defaults,plateau,halfWave,kinetic,curve,interp,sweeps,cvAnalysis,klFit,analyzeSample,analyzeBatch,exports,resultFields,summaryFields,summaryRows};
+  return {defaults,plateau,halfWave,kinetic,curve,interp,sweeps,hupdRegion,cvAnalysis,klFit,analyzeSample,analyzeBatch,exports,resultFields,summaryFields,summaryRows};
 })();
 if(typeof module!=='undefined')module.exports=ECAnalysis;

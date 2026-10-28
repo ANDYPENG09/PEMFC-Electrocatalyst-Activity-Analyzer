@@ -12,7 +12,7 @@ def main():
     parser.add_argument("--plot",action="store_true")
     args=parser.parse_args()
     directory=Path(args.output);directory.mkdir(parents=True,exist_ok=True)
-    payload=dict(samples=[sample(),sample("PtCo",.87)],kl=kl_data())
+    payload=dict(samples=[sample("Synthetic Pt"),sample("Synthetic PtCo",.87,.8)],kl=kl_data())
     (directory/"input.json").write_text(json.dumps(payload,indent=2),encoding="utf-8")
     result=analyze_batch(payload["samples"]);result["kl"]=kl_fit(**payload["kl"])
     export_analysis(result,directory)

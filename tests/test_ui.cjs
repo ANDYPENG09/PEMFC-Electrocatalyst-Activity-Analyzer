@@ -115,6 +115,17 @@ const tick=()=>new Promise(r=>setTimeout(r,20));
  assert.equal(el('o_ecsa').textContent,exact.ecsa_m2_g.toFixed(2));
  const expectedSA=w.eval(`(()=>{const j=Math.abs(num('jE')),jl=Math.abs(num('jlim'));return j*jl/(jl-j)/(ecsaResult.ecsa_m2_g*computePtLoad()/100)})()`);
  assert.equal(el('o_sa').textContent,expectedSA.toFixed(3));
+ // The plotted line stays measured below the baseline; only the fill is clipped.
+ el('cvText').value=[0,.1,.2,.3,.4].map((e,i)=>[e,[-1,1,-1,1,-1][i]*Number(el('area').value)/1000].join(',')).join('\n');
+ el('hlo').value='0';el('hhi').value='.4';el('baselineMode').value='manual';el('baseline').value='0';click('cvBtn');
+ const region=w.eval('lastCvZoom.region');
+ assert(Math.abs(region.current[0]+1)<1e-12);assert.equal(region.upper[0],0);
+ assert(Math.abs(region.area-.1)<1e-12);
+ assert(el('cvPlotZoom').textContent.includes('Measured anodic sweep'));
+ assert(el('cvPlotZoom').querySelector('[data-annotation="fill"]'));
+ el('cvXmin').value='0';el('cvXmax').value='.4';click('cvApplyX');
+ assert(el('cvPlotZoom').textContent.includes('Measured anodic sweep'));
+ el('cvXmin').value='';el('cvXmax').value='';el('baselineMode').value='origin';
  click('cvClear');assert.equal(el('o_sa').textContent,'—');assert.notEqual(el('o_ma').textContent,'—');
  click('loadExample');el('qspec').value='0';click('cvBtn');assert.equal(el('o_ecsa').textContent,'—');assert.equal(el('o_sa').textContent,'—');
  el('qspec').value='0.21';el('qUnit').value='mC/cm²';
