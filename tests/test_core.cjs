@@ -7,6 +7,12 @@ assert(reads<50,`Expected logarithmic search; read ${reads} points`);
 for(const t of [NaN,Infinity,-Infinity,-1,1001])assert.equal(a.interp(x,y,t),null);
 assert.equal(a.interp([0,1],[0,2],0.5),null);
 assert.equal(a.interp([0,1],[0,2],0.5,Infinity),1);
+// Positive integration must stop exactly where a line crosses the baseline.
+const region=a.hupdRegion([0,.1,.2,.3,.4],[-1,1,-1,1,-1],0,.4,0);
+assert(Math.abs(region.area-.1)<1e-12);
+assert.equal(region.current[0],-1);
+assert.equal(region.upper[0],0);
+assert(region.x.some(x=>Math.abs(x-.05)<1e-12));
 // Large curves should not hit the engine's argument-count limit.
 const E=Array.from({length:150000},(_,i)=>i/149999),j=E.map(e=>-6/(1+Math.exp((e-.85)/.025)));
 assert(a.plateau(E,j));

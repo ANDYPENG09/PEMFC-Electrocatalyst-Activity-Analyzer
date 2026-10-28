@@ -240,36 +240,52 @@ def ecsa_from_hupd(E, j, v, e_lo: float = 0.05, e_hi: float = 0.4,
 
     步骤：
       1) 把单圈 CV 拆成 正向(电位升) / 反向(电位降) 两段；
-      2) 各段在 [e_lo, e_hi] 内对 j(mA/cm²) 积分 S = ∫j dE (mA·V/cm²)；
+      2) 各段在 [e_lo, e_hi] 内对已扣除基线的 j(mA/cm²) 积分 S = ∫j dE (mA·V/cm²)；
       3) S_H = (|S_正向| + |S_反向|)/2；Q_H = S_H / v (mC/cm², 几何)；
-      4) ECSA_geo = Q_H·A_geo / q_specific；粗糙因子 RF = Q_H / q_specific；
+      4) ECSA_geo = Q_H·A_geo / q_specific_mC；粗糙因子 RF = Q_H / q_specific_mC；
       5) 若给出 Pt 载量 loading_ug_cm2，按常用公式算比表面积：
          ECSA(m²/g) = 100·S_H / (q_specific_mC·v·loading_ug_cm2)。
 
-    参数：v 扫速(V/s)；q_specific Pt 单层 Hupd 电荷≈210 µC/cm²(0.21 mC/cm²)。
+    此旧接口不自动扣双电层基线；输入 j 前须对正反向分别扣除。
+    需要自动基线的工作台算法请使用 electrochem_analysis.cv_analysis。
+    参数：v 扫速(V/s)；q_specific 单位 C/cm²，默认 210 µC/cm²。
     返回含各量的 dict，单位见键名。
     """
     E = np.asarray(E, float)
     j = np.asarray(j, float)
+    if E.ndim != 1 or j.ndim != 1 or len(E) != len(j) or len(E) < 2:
+        raise ValueError("CV requires at least two paired points")
+    if not np.isfinite(E).all() or not np.isfinite(j).all():
+        raise ValueError("CV points must be finite")
+    if not np.isfinite([v, e_lo, e_hi, q_specific, area_cm2]).all() or v <= 0 or q_specific <= 0 or area_cm2 <= 0 or e_lo >= e_hi:
+        raise ValueError("Invalid Hupd integration parameters")
     d = np.diff(E)
-    tp = np.where(np.diff(np.sign(d)) != 0)[0]
-    if tp.size > 0:
-        t = int(tp[0])
+    nonzero = np.flatnonzero(d)
+    if not nonzero.size:
+        raise ValueError("CV requires a potential sweep")
+    turns = np.flatnonzero(np.diff(np.sign(d[nonzero])))
+    if turns.size:
+        t = int(nonzero[turns[0]] + 1)  # actual turning point, included in both branches
         Ef, Eb, jf, jb = E[:t + 1], E[t:], j[:t + 1], j[t:]
     else:
         Ef = Eb = E
         jf = jb = j
 
     def _sint(Es, Js):
-        m = (Es >= e_lo) & (Es <= e_hi)
-        if m.sum() < 2:
-            return 0.0
-        return float(_trapz(Js[m], Es[m]))   # mA·V/cm² (几何)
+        # Interpolate at both limits; reject partial coverage, never extrapolate.
+        xs, keep = np.unique(Es, return_index=True)
+        ys = Js[keep]
+        if len(xs) < 2 or xs[0] > e_lo or xs[-1] < e_hi:
+            raise ValueError("Each CV branch must cover the Hupd integration range")
+        knots = np.r_[e_lo, xs[(xs > e_lo) & (xs < e_hi)], e_hi]
+        integral = float(_trapz(np.interp(knots, xs, ys), knots))
+        return integral if Es[-1] > Es[0] else -integral  # preserve sweep direction
 
     Sf, Sb = _sint(Ef, jf), _sint(Eb, jb)
     S_H = (abs(Sf) + abs(Sb)) / 2.0          # mA·V/cm² (几何)
     Q_H = S_H / v                            # mC/cm² (几何)
-    ecsa_cm2 = Q_H * area_cm2 / q_specific
+    # Q_H is mC/cm²_geo; q_specific is C/cm²_Pt.
+    ecsa_cm2 = Q_H * area_cm2 / (q_specific * 1e3)
     out = {
         "S_fwd_mA_V_per_cm2": Sf,
         "S_bwd_mA_V_per_cm2": Sb,

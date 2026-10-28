@@ -112,8 +112,8 @@
 
 <!-- Standard info -->
 <div class="card">
-  <div class="card-title">Test Standard</div>
-  <p class="std-desc">Based on GB/T 20042.4-2025. Methods are compatible with US DOE and EU JRC/IEC protocols (Hupd ECSA, K-L kinetic current, q = 0.21 mC/cm²).</p>
+  <div class="card-title">Method note</div>
+  <p class="std-desc">Hupd ECSA and K-L kinetic current; the default Pt charge density is 0.21 mC/cm². Check the baseline and experimental protocol for your data.</p>
 </div>
 
 <!-- ECSA -->
@@ -402,7 +402,7 @@
   <pre id="klResult" style="white-space:pre-wrap" aria-live="polite"></pre><div class="plot" id="klPlot"></div>
 </section>
 <!-- WORKBENCH END -->
-<footer>v1.2.2 &middot; MIT License &middot; Author: ANDYPENG09 &middot; Pure HTML/JS &middot; Offline &middot; No Origin Required</footer>
+<footer>v1.3.0 + ECSA fixes &middot; MIT License &middot; Author: ANDYPENG09 &middot; Pure HTML/JS &middot; Offline &middot; No Origin Required</footer>
 
 </div>
 
@@ -470,6 +470,26 @@ const ECAnalysis = (() => {
     for(let i=1;i<x.length;i++){const sign=Math.sign(x[i]-x[i-1]);if(sign&&direction&&sign!==direction){if(i-start>=3)out.push([x.slice(start,i),y.slice(start,i)]);start=i-1;}if(sign)direction=sign;}
     if(x.length-start>=3)out.push([x.slice(start),y.slice(start)]);return out;
   }
+  // Insert exact baseline crossings before clipping, so the shaded polygon and
+  // its trapezoidal area match the positive part of the measured line segments.
+  function hupdRegion(x,y,lo,hi,baseline){
+    const points=[lo,...x.filter(v=>v>lo&&v<hi),hi],px=[],current=[];
+    for(let i=0;i<points.length;i++){
+      const value=interp(x,y,points[i],Infinity);
+      if(i){
+        const previous=current.at(-1)-baseline, next=value-baseline;
+        if(previous*next<0){
+          px.push(px.at(-1)+(points[i]-px.at(-1))*(-previous)/(next-previous));
+          current.push(baseline);
+        }
+      }
+      px.push(points[i]);current.push(value);
+    }
+    const upper=current.map(v=>Math.max(baseline,v));
+    let area=0;
+    for(let i=1;i<px.length;i++)area+=(px[i]-px[i-1])*(upper[i]+upper[i-1]-2*baseline)/2;
+    return {x:px,current,upper,area};
+  }
   function cvAnalysis(cv,loading){
     const empty={ecsa_m2_g:null,stability_fraction:null,anodic_sweeps:0};if(!cv)return empty;
     const [lo,hi]=cv.hupd_range_V||[0.05,0.4],rate=cv.scan_rate_V_s??0.02,q=cv.q_mC_cm2??0.21;
@@ -478,8 +498,7 @@ const ECAnalysis = (() => {
     if(!branches.length)return empty;
     const [x,y]=branches.at(-1),baseline=cv.baseline_mA_cm2??interp(x,y,hi,Infinity);
     if(!Number.isFinite(baseline))throw Error('CV baseline must be finite');
-    const xx=[lo,...x.filter(v=>v>lo&&v<hi),hi],yy=xx.map(v=>Math.max(0,interp(x,y,v,Infinity)-baseline));
-    let sh=0;for(let i=1;i<xx.length;i++)sh+=(xx[i]-xx[i-1])*(yy[i]+yy[i-1])/2;
+    const sh=hupdRegion(x,y,lo,hi,baseline).area;
     let stability=null;
     if(branches.length>=2){const [a,b]=branches.slice(-2),l=Math.max(a[0][0],b[0][0]),h=Math.min(a[0].at(-1),b[0].at(-1)),grid=Array.from({length:101},(_,i)=>l+(h-l)*i/100),ya=grid.map(v=>interp(...a,v,Infinity)),yb=grid.map(v=>interp(...b,v,Infinity));stability=Math.sqrt(mean(ya.map((v,i)=>(v-yb[i])**2)))/Math.max(Math.sqrt(mean(yb.map(v=>v*v))),1e-12);}
     return {ecsa_m2_g:loading&&sh>0?100*sh/(q*rate*loading*1000):null,stability_fraction:stability,anodic_sweeps:branches.length,SH_mA_V_cm2:sh,baseline_mA_cm2:baseline};
@@ -548,7 +567,7 @@ const ECAnalysis = (() => {
     return rows;
   }
   function exports(analysis){return {'analysis.json':JSON.stringify(analysis,null,2),'results.csv':csv(resultFields,analysis.samples.map(s=>({sample_id:s.sample_id,...s.metrics,qc_status:s.qc.status}))),'processed_cv.csv':csv(cvFields,analysis.samples.flatMap(s=>s.processed_cv)),'processed_orr.csv':csv(orrFields,analysis.samples.flatMap(s=>s.processed_orr)),'summary.csv':csv(summaryFields,summaryRows(analysis))};}
-  return {defaults,plateau,halfWave,kinetic,curve,interp,sweeps,cvAnalysis,klFit,analyzeSample,analyzeBatch,exports,resultFields,summaryFields,summaryRows};
+  return {defaults,plateau,halfWave,kinetic,curve,interp,sweeps,hupdRegion,cvAnalysis,klFit,analyzeSample,analyzeBatch,exports,resultFields,summaryFields,summaryRows};
 })();
 if(typeof module!=='undefined')module.exports=ECAnalysis;
 
@@ -2005,21 +2024,20 @@ function calcECSA(){
     if(!Number.isFinite(result.SH_mA_V_cm2))throw Error('No anodic sweep covers the integration range / 没有完整覆盖积分范围的阳极扫描');
     const [sx,sy]=ECAnalysis.sweeps(X,Y).filter(([x])=>x.at(-1)>x[0]&&x[0]<=lo&&x.at(-1)>=hi).at(-1);
     const keep=sx.map((x,i)=>i===0||x>sx[i-1]),xx=sx.filter((_,i)=>keep[i]),yy=sy.filter((_,i)=>keep[i]);
-    const px=[lo,...xx.filter(x=>x>lo&&x<hi),hi],baseline=result.baseline_mA_cm2;
-    // The shaded polygon is the same positive, baseline-subtracted area used by the core.
-    const py=px.map(x=>Math.max(baseline,ECAnalysis.interp(xx,yy,x,Infinity)));
+    const baseline=result.baseline_mA_cm2;
+    const region=ECAnalysis.hupdRegion(xx,yy,lo,hi,baseline);
     lastFullCycle={X,Y};lastAnodicSweep=[xx,yy];ecsaResult=result;
     const SH=result.SH_mA_V_cm2,QH=SH/v,area=QH*A/q;
     $('o_SH').textContent=fmt(SH,5);$('o_QH').textContent=fmt(QH,4);
     $('o_ecsa').textContent=fmt(result.ecsa_m2_g,2);$('o_ecsa_cm2').textContent=fmt(area,3);$('o_rf').textContent=fmt(area/A,2);
     $('cvMsg').textContent=`S_H = ${SH.toFixed(5)} mA·V/cm²; baseline = ${baseline.toFixed(5)} mA/cm²; ${$('baselineMode').value==='manual'?'manual / 手动':`j@${hi.toFixed(3)} V / 积分上限基线`}.`;
-    drawCvPlots(lo,hi,px,py,baseline);
+    drawCvPlots(lo,hi,region,baseline);
   }catch(e){$('cvMsg').textContent=e.message;}
   finally{calcORR();}
 }
 
 /* ===== Plotting ===== */
-function drawCvPlots(lo, hi, px, py, j_bg){
+function drawCvPlots(lo, hi, region, j_bg){
   if (!lastFullCycle){
     $("cvPlotFull").innerHTML = "";
     $("cvPlotZoom").innerHTML = "";
@@ -2031,14 +2049,18 @@ function drawCvPlots(lo, hi, px, py, j_bg){
     title: "CV", xlabel: "E (V vs RHE)", ylabel: "J (mA/cm\u00B2)",
     regions: [{ x0: lo, x1: hi, color: "#0071e3" }]
   });
-  lastCvZoom = { px, py, j_bg };
-  const baselineY = px.map(() => j_bg);
+  lastCvZoom = { region, j_bg };
+  drawCvZoom();
+}
+function drawCvZoom(){
+  const {region,j_bg}=lastCvZoom;
+  const px=region.x, baselineY=px.map(() => j_bg);
   svgChart($("cvPlotZoom"), [
-    { x: px, y: py, color: "#0071e3" },
-    { x: px, y: baselineY, color: "#d70015", dashed: true }
+    { x: px, y: region.current, color: "#0071e3", name: "Measured anodic sweep" },
+    { x: px, y: baselineY, color: "#d70015", dashed: true, name: "Baseline" }
   ], Object.assign({
-    title: "Hupd Peak \u00B7 Baseline-subtracted Area", xlabel: "E (V vs RHE)", ylabel: "J (mA/cm\u00B2)",
-    fills: [{ x: px, y: py, base: baselineY, color: "#00875a" }]
+    title: "Hupd desorption \u00B7 Positive area above baseline", xlabel: "E (V vs RHE)", ylabel: "J (mA/cm\u00B2)",
+    fills: [{ x: px, y: region.upper, base: baselineY, color: "#00875a" }]
   }, cvXOpt()));
 }
 
@@ -2170,15 +2192,7 @@ function cvXOpt(){
 }
 $("cvApplyX").addEventListener("click", () => {
   if (!lastCvZoom){ alert("Please generate the Hupd plot first."); return; }
-  const { px, py, j_bg } = lastCvZoom;
-  const baselineY = px.map(() => j_bg);
-  svgChart($("cvPlotZoom"), [
-    { x: px, y: py, color: "#0071e3" },
-    { x: px, y: baselineY, color: "#d70015", dashed: true }
-  ], Object.assign({
-    title: "Hupd Peak \u00B7 Baseline-subtracted Area", xlabel: "E (V vs RHE)", ylabel: "J (mA/cm\u00B2)",
-    fills: [{ x: px, y: py, base: baselineY, color: "#00875a" }]
-  }, cvXOpt()));
+  drawCvZoom();
 });
 
 /* ===== LSV Y-axis manual control ===== */
@@ -2462,12 +2476,15 @@ document.querySelector('.frac-tag[data-f="30"]').classList.add("active");
     const els=[];if($('wbExportCv').checked)els.push($('wbCvPlot'));if($('wbExportLsv').checked)els.push($('wbOrrPlot'));
     exportPNGCombined(els,'comparison.png');
   };
-  function demoSample(id,center){
+  function demoSample(id,center,scale){
     const E=Array.from({length:201},(_,i)=>0.2+i*0.004),j=E.map(e=>-6/(1+Math.exp((e-center)/0.025)));
-    const ce=[],cj=[];for(let cycle=0;cycle<3;cycle++){for(let i=0;i<100;i++){const e=i/100;ce.push(e);cj.push(0.08+0.7*Math.exp(-(((e-0.18)/0.07)**2)));}for(let i=100;i>0;i--){ce.push(i/100);cj.push(-0.08);}}ce.push(0);cj.push(0.08);
+    const peak=(e,c,w)=>Math.exp(-(((e-c)/w)**2));
+    const up=e=>0.05+scale*(0.34*peak(e,.13,.045)+0.24*peak(e,.24,.065)+0.10/(1+Math.exp(-(e-.91)/.03)));
+    const down=e=>-0.05-scale*(0.30*peak(e,.12,.05)+0.21*peak(e,.23,.065)+0.20*peak(e,.74,.075));
+    const ce=[],cj=[];for(let cycle=0;cycle<3;cycle++){for(let i=0;i<100;i++){const e=i/100;ce.push(e);cj.push(up(e));}for(let i=100;i>0;i--){const e=i/100;ce.push(e);cj.push(down(e));}}ce.push(0);cj.push(up(0));
     return {sample_id:id,orr:{E,j},n2:{E,j:E.map(()=>0)},cv:{E:ce,j:cj,scan_rate_V_s:0.02},loading_mg_cm2:0.02,metadata:{synthetic:true}};
   }
-  $('wbDemo').onclick=guarded(()=>{let suffix=1;while(samples.some(s=>s.sample_id===`Demo-Pt-${suffix}`||s.sample_id===`Demo-PtCo-${suffix}`))suffix++;commit([...samples,demoSample(`Demo-Pt-${suffix}`,0.85),demoSample(`Demo-PtCo-${suffix}`,0.87)]);});
+  $('wbDemo').onclick=guarded(()=>{let suffix=1;while(samples.some(s=>s.sample_id===`Demo-Pt-${suffix}`||s.sample_id===`Demo-PtCo-${suffix}`))suffix++;commit([...samples,demoSample(`Demo-Pt-${suffix}`,0.85,1),demoSample(`Demo-PtCo-${suffix}`,0.87,.8)]);});
   try{
     const saved=JSON.parse(localStorage.getItem(historyKey)||'null');
     if(saved){if(saved.history_version!==1||!Array.isArray(saved.samples))throw Error('Unsupported history');commit(saved.samples,new Set(saved.selected||saved.samples.map(s=>s.sample_id)),false);nextName();}
@@ -2503,7 +2520,7 @@ document.querySelector('.frac-tag[data-f="30"]').classList.add("active");
   const exact = new Map([
     ['Import Autolab NOVA PAAX','导入 Autolab NOVA PAAX'],['PAAX file','PAAX 文件'],['Select PAAX trace','选择 PAAX 曲线'],['Load into CV','导入 CV'],['Load into O₂ LSV','导入 O₂ LSV'],['Load into N₂ Background','导入 N₂ 背景'],
     ['Read PAAX files directly, select a potential/current trace, then load it into CV, O₂ LSV or N₂ background. Imported values use V and A. Confirm scan rate, reference and loading before calculation.','直接读取 PAAX，选择电位/电流曲线后导入 CV、O₂ LSV 或 N₂ 背景；导入值使用 V 和 A。计算前请确认扫描速率、参比和载量。'],
-    ['Test Standard','测试标准'],
+    ['Method note','方法说明'],
     ['Electrochemical Surface Area (ECSA · Hupd Method)','电化学活性表面积（ECSA · Hupd 法）'],
     ['Scan Rate','扫描速率'],['Pt Monolayer Charge q','Pt 单层氢吸附电荷 q'],['RDE Geometric Area (cm²)','RDE 几何面积 (cm²)'],
     ['Ink Concentration (mg/mL)','墨水浓度 (mg/mL)'],['Drop Volume (µL)','滴涂体积 (µL)'],['Pt Weight Fraction (%)','Pt 质量分数 (%)'],['→ Pt Loading (µg/cm²)','→ Pt 载量 (µg/cm²)'],
@@ -2549,7 +2566,7 @@ document.querySelector('.frac-tag[data-f="30"]').classList.add("active");
   exact.set("Multi-rpm Koutecký–Levich · 多转速拟合","多转速拟合");
   const phrases = [
     ['Hupd background subtraction · ECSA · ORR mass/specific activity · Offline calculation','Hupd 背景扣除 · ECSA · ORR 质量/比活性 · 离线计算'],
-    ['Based on GB/T 20042.4-2025. Methods are compatible with US DOE and EU JRC/IEC protocols (Hupd ECSA, K-L kinetic current, q = 0.21 mC/cm²).','基于 GB/T 20042.4-2025；方法兼容美国 DOE 与欧盟 JRC/IEC 常用流程（Hupd ECSA、K-L 动力学电流，q = 0.21 mC/cm²）。'],
+    ['Hupd ECSA and K-L kinetic current; the default Pt charge density is 0.21 mC/cm². Check the baseline and experimental protocol for your data.','采用 Hupd ECSA 和 K-L 动力学电流；默认 Pt 电荷密度为 0.21 mC/cm²。请根据实际数据检查基线和实验流程。'],
     ['Capture the current CV/O₂/N₂ inputs, or import sample JSON files. Each capture is a snapshot; recapture after changing inputs. Analysis uses cathodic currents and a continuous diffusion plateau. Missing results are shown as —.','可捕获当前 CV/O₂/N₂ 输入，或导入样品 JSON。每次捕获都是快照，修改输入后需重新捕获。分析采用阴极电流与连续扩散平台；缺失结果显示为 —。'],
     ['RHE conversion and E − I·Ru apply only to captured workbench data. Use Ru = 0 if already corrected. Hupd bounds above are interpreted in V vs RHE here. Original manual calculators remain available.','RHE 换算与 E − I·Ru 仅作用于工作台捕获的数据；若数据已校正，请设 Ru = 0。此处 Hupd 范围按 V vs RHE 解释；原手动计算器仍保留。'],
     ['Paste/import CSV: rpm,potential_V_RHE,j_mA_cm2. Supply a single corrected ORR sweep per rpm, at least three distinct speeds. Values must already be in V vs RHE and mA/cm²; no background or potential correction is applied here.','粘贴/导入 CSV：rpm,potential_V_RHE,j_mA_cm2。每个转速提供一条已校正 ORR 扫描，至少三个不同转速。数据必须已为 V vs RHE 与 mA/cm²；此处不再做背景或电位校正。'],

@@ -6,26 +6,21 @@ import tempfile
 import unittest
 import numpy as np
 import electrochem_calc as legacy
+from demo_data import synthetic_cv
 from electrochem_analysis import (analyze_batch, analyze_sample, detect_plateau,
     export_analysis, half_wave, kl_fit, RESULT_FIELDS, CV_FIELDS, ORR_FIELDS, SUMMARY_FIELDS)
-from electrochem_analysis import load_kl_csv
+from electrochem_analysis import load_kl_csv, cv_analysis
 
 ROOT=Path(__file__).resolve().parents[1]
 
 
-def sample(name="Pt", center=0.85):
+def sample(name="Pt", center=0.85, cv_scale=1.0):
     e=np.linspace(0.2,1,201)
     j=-6/(1+np.exp((e-center)/0.025))
-    ce=[];cj=[]
-    for _ in range(3):
-        for i in range(100):
-            v=i/100;ce.append(v);cj.append(0.08+0.7*np.exp(-((v-0.18)/0.07)**2))
-        for i in range(100,0,-1):
-            ce.append(i/100);cj.append(-0.08)
-    ce.append(0);cj.append(0.08)
+    ce,cj=synthetic_cv(scale=cv_scale)
     return dict(sample_id=name,orr=dict(E=e.tolist(),j=j.tolist()),
                 n2=dict(E=e.tolist(),j=np.zeros_like(e).tolist()),
-                cv=dict(E=ce,j=cj,scan_rate_V_s=0.02),loading_mg_cm2=0.02,
+                cv=dict(E=ce.tolist(),j=cj.tolist(),scan_rate_V_s=0.02),loading_mg_cm2=0.02,
                 metadata=dict(synthetic=True))
 
 
@@ -39,6 +34,37 @@ def kl_data():
 
 
 class AnalysisTests(unittest.TestCase):
+    def test_hupd_crossings_and_units(self):
+        cv=dict(E=[0,.1,.2,.3,.4],j=[-1,1,-1,1,-1],
+                hupd_range_V=[0,.4],baseline_mA_cm2=0,scan_rate_V_s=.02)
+        result=cv_analysis(cv,.02)
+        # Two triangles, each with base 0.1 V and height 1 mA/cm².
+        self.assertAlmostEqual(result["SH_mA_V_cm2"],.1)
+        self.assertAlmostEqual(result["ecsa_m2_g"],100*.1/(.21*.02*20))
+        program="const a=require('./web/analysis.js');console.log(JSON.stringify(a.cvAnalysis(JSON.parse(process.argv[1]),.02)))"
+        js=json.loads(subprocess.run(["node","-e",program,json.dumps(cv)],capture_output=True,text=True,cwd=ROOT,check=True).stdout)
+        self.assertAlmostEqual(js["SH_mA_V_cm2"],.1)
+        self.assertAlmostEqual(js["ecsa_m2_g"],result["ecsa_m2_g"])
+
+        old=legacy.ecsa_from_hupd([.05,.2,.4],[0,1,0],.02,area_cm2=.2,loading_ug_cm2=20)
+        self.assertAlmostEqual(old["ECSA_cm2"],old["ECSA_m2_per_g"]*20*.2/100)
+        self.assertAlmostEqual(old["roughness_factor"],old["ECSA_cm2"]/.2)
+        old=legacy.ecsa_from_hupd([.05,.2,.4,.4,.2,.05],[0,1,0,0,-.5,0],.02)
+        self.assertAlmostEqual(old["S_fwd_mA_V_per_cm2"],.175)
+        self.assertAlmostEqual(old["S_bwd_mA_V_per_cm2"],.0875)
+        bounded=legacy.ecsa_from_hupd([0,.1,.3,.5],[0,1,1,0],.02,e_lo=.05,e_hi=.4)
+        self.assertAlmostEqual(bounded["S_avg_mA_V_per_cm2"],.3125)
+        with self.assertRaises(ValueError):
+            legacy.ecsa_from_hupd([.1,.2,.3],[0,1,0],.02,e_lo=.05,e_hi=.4)
+
+    def test_synthetic_cv_has_both_hupd_branches(self):
+        e,j=synthetic_cv(lo=.05,hi=1,cycles=1)
+        self.assertGreaterEqual(e.min(),.05)
+        self.assertLessEqual(e.max(),1)
+        self.assertGreater(j[(e>.1)&(e<.2)].max(),.3)
+        self.assertLess(j[(e>.1)&(e<.2)].min(),-.3)
+        self.assertLess(j[(e>.65)&(e<.8)].min(),-.15)
+
     def test_known_logistic_metrics(self):
         r=analyze_sample(sample())
         self.assertEqual(r["qc"]["status"],"Good")

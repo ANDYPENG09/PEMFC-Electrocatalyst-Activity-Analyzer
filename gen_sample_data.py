@@ -8,6 +8,7 @@ CSV chain and the .paax chain of run_example.py agree by construction.
 import numpy as np
 import pandas as pd
 import os, urllib.parse
+from demo_data import synthetic_cv
 
 rng = np.random.default_rng(42)
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -24,19 +25,8 @@ o2_j = -5.5 / (1 + np.exp((E - E_mid) / width)) + rng.normal(0, 0.02, E.size)
 corr_j = o2_j - np.interp(E, E[::-1], n2_j[::-1])         # N2-corrected
 
 # ---------------- shared CV data (3 cycles, small currents) ----------------
-def tri(vlo=0.05, vhi=1.0, n=400):
-    t = np.linspace(0, 1, n)
-    return vlo + (vhi - vlo) * (2 * np.abs(2 * t - 1))
-
-def cv_i(E_v):
-    hu = np.exp(-((E_v - 0.12) / 0.06) ** 2) * 5.5e-5
-    hc = np.exp(-((E_v - 0.10) / 0.08) ** 2) * -4.2e-5
-    ox = np.exp(-((E_v - 0.95) / 0.10) ** 2) * 2.8e-5
-    red = np.exp(-((E_v - 0.78) / 0.05) ** 2) * -3.6e-5
-    return hu + hc + ox + red + rng.normal(0, 5e-7, E_v.size)
-
-cv_e = np.concatenate([tri() for _ in range(3)])
-cv_iA = np.concatenate([cv_i(tri()) for _ in range(3)])
+cv_e, cv_j = synthetic_cv(scale=.8, lo=.05, hi=1.0, points_per_sweep=200)
+cv_iA = cv_j * AREA_CM2 / 1000 + rng.normal(0, 1e-7, cv_e.size)
 
 # ---------------- O2LSV.csv ----------------
 lsv = pd.DataFrame({
