@@ -28,7 +28,7 @@ The included **Example** results are derived from the anonymized CV/O₂/N₂ ex
 
 This is a review aid, not a diagnostic system, laboratory accreditation, certificate of analysis, automatic disposition, or guarantee of causal inference. It does not calculate SPC control limits, process capability, or customer-specific acceptance criteria. The synthetic scenario and thresholds do not represent an actual customer case.
 
-Run `node tests/test_core.cjs` from this directory to check the CSV parser, data-quality gating, contextual comparison, signed-current comparison and specification handling. See the parent repository for analysis methods and the export schema.
+Run `node tests/test_core.cjs` and `node tests/test_ui.cjs` from this directory to check the CSV parser, data-quality gating, contextual comparison, signed-current comparison, specification handling, import events, language switching and printable report. The UI-flow test uses a lightweight mocked DOM; browser rendering and interactive controls were also checked separately. See the parent repository for analysis methods and the export schema.
 
 ## 中文说明
 
