@@ -1,4 +1,12 @@
 const assert=require('node:assert/strict'),a=require('../web/analysis.js');
+const demo=require('../web/demo.js');
+assert.equal(demo.data_origin,'synthetic');
+const synthetic=demo.cv(1,1,100);
+assert.equal(synthetic.E[0],.025);
+assert.equal(synthetic.E[100],1.2);
+assert.equal(synthetic.E.at(-1),.025);
+assert(Math.abs(synthetic.j[99]-synthetic.j[100])<.02);
+assert(Math.abs(synthetic.j[199]-synthetic.j[200])<.1);
 // Performance contract: binary search must not visit every potential.
 const n=1000000,x=Array.from({length:n},(_,i)=>i/1000),y=x.map(v=>2*v);let reads=0;
 const tracked=new Proxy(x,{get(target,key){if(/^\d+$/.test(String(key)))reads++;return target[key];}});

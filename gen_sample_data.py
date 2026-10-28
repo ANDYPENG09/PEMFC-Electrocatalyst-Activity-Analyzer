@@ -2,7 +2,7 @@
 """Generate desensitized synthetic demo data for run_example.py.
 
 Produces sample_data/O2LSV.csv, sample_data/CV.csv and
-sample_data/Example.paax from one shared data source, so the
+sample_data/synthetic-demo.paax from one shared data source, so the
 CSV chain and the .paax chain of run_example.py agree by construction.
 """
 import numpy as np
@@ -41,7 +41,7 @@ lsv.to_csv(os.path.join(OUT, "O2LSV.csv"), index=False)
 cv = pd.DataFrame({"1": np.round(cv_e, 4), "C": np.round(cv_iA, 8)})
 cv.to_csv(os.path.join(OUT, "CV.csv"), index=False)
 
-# ---------------- Example.paax (Autolab NOVA DAB/XML) ----------------
+# ---------------- synthetic-demo.paax (Autolab NOVA DAB/XML) ----------------
 def esc(s):
     return urllib.parse.quote(s)
 
@@ -57,12 +57,12 @@ def trace(name, x, y, xqty="potential", yqty="current", xunit="V", yunit="A"):
             f'<Y_data>{fmt(y)}</Y_data></points>\n  </DAB_node>')
 
 xml = ('<?xml version="1.0" encoding="UTF-8"?>\n'
-       '<DAB version="1.0" app="NOVA" export="demo">\n'
+       '<DAB version="1.0" app="NOVA" export="demo" origin="synthetic">\n'
        + trace("O2 LSV", E, o2_j * AREA_CM2 / 1000.0)
        + trace("N2 LSV", E, n2_j * AREA_CM2 / 1000.0)
        + trace("CV 3 cycles", cv_e, cv_iA)
        + '</DAB>\n')
-with open(os.path.join(OUT, "Example.paax"), "w", encoding="utf-8") as f:
+with open(os.path.join(OUT, "synthetic-demo.paax"), "w", encoding="utf-8") as f:
     f.write(xml)
 
 print("written:", sorted(os.listdir(OUT)))

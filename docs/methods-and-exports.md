@@ -19,7 +19,7 @@ A self-contained, offline electrochemistry calculator for **PEM fuel cell cataly
 ## Quick Start
 
 1. Open `index.html` in any modern browser. The file includes its scripts and works directly from disk, without a server or internet.
-2. Click **Load Example Data** to see a pre-filled demo (EC-30-PtCo sample).
+2. Click **Load Example Data** to see synthetic CV and LSV demo curves, not experimental data.
 3. Or paste your own CV data (potential V, current A) into the CV textarea.
 4. Click **Calculate ECSA** → results appear instantly with SVG charts.
 
@@ -115,6 +115,8 @@ These defaults are **screening heuristics, not standards certification**. `Good`
 The single-sample HTML and workbench use the **last complete anodic Hupd sweep**, a horizontal endpoint baseline at the upper integration bound, positive baseline-subtracted area and interpolated bounds. Where the measured line crosses the baseline, an interpolated crossing is inserted before integration. The plotted line remains the measured line; only the filled area is clipped at the baseline. This convention is identical in the JS and Python workbench cores. Use `baseline_mA_cm2` to specify a manual baseline. A horizontal baseline is an approximation and may be unsuitable for some supports or protocols.
 
 The legacy Python `ecsa_from_hupd` remains a distinct two-sweep mean method: it integrates the currents supplied and **does not subtract a baseline**. Supply separately baseline-corrected currents for each branch, or use `electrochem_analysis.cv_analysis` for automatic endpoint-baseline subtraction. Its returned Pt area and roughness factor now correctly convert mC to C; specific ECSA units were already converted separately. Turning points and integration limits are now handled explicitly, and incomplete coverage is rejected. Results from the two methods can differ.
+
+To export an Origin project on Windows with Origin, originpro and pywin32 installed, run `python extract_origin.py path/to/project.opju`. Add `--output path/to/folder` to override the default `origin_export` directory beside the project.
 
 ### Multi-rpm K–L import
 
