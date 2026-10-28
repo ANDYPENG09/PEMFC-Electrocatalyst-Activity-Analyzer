@@ -14,14 +14,14 @@ from electrochem_analysis import load_kl_csv, cv_analysis
 ROOT=Path(__file__).resolve().parents[1]
 
 
-def sample(name="Pt", center=0.85, cv_scale=1.0):
+def sample(name="Pt", center=0.85, cv_scale=1.0, cv_points=100):
     e=np.linspace(0.2,1,201)
     j=-6/(1+np.exp((e-center)/0.025))
-    ce,cj=synthetic_cv(scale=cv_scale)
+    ce,cj=synthetic_cv(scale=cv_scale,points_per_sweep=cv_points)
     return dict(sample_id=name,orr=dict(E=e.tolist(),j=j.tolist()),
                 n2=dict(E=e.tolist(),j=np.zeros_like(e).tolist()),
                 cv=dict(E=ce.tolist(),j=cj.tolist(),scan_rate_V_s=0.02),loading_mg_cm2=0.02,
-                metadata=dict(synthetic=True))
+                metadata=dict(synthetic=True,data_origin="synthetic"))
 
 
 def kl_data():
@@ -61,9 +61,14 @@ class AnalysisTests(unittest.TestCase):
         e,j=synthetic_cv(lo=.05,hi=1,cycles=1)
         self.assertGreaterEqual(e.min(),.05)
         self.assertLessEqual(e.max(),1)
-        self.assertGreater(j[(e>.1)&(e<.2)].max(),.3)
-        self.assertLess(j[(e>.1)&(e<.2)].min(),-.3)
+        self.assertGreater(j[(e>.1)&(e<.2)].max(),.15)
+        self.assertLess(j[(e>.1)&(e<.2)].min(),-.15)
         self.assertLess(j[(e>.65)&(e<.8)].min(),-.15)
+        demo=synthetic_cv()
+        program="const d=require('./web/demo.js');console.log(JSON.stringify(d.cv()))"
+        js=json.loads(subprocess.run(["node","-e",program],capture_output=True,text=True,cwd=ROOT,check=True).stdout)
+        np.testing.assert_allclose(js["E"],demo[0],atol=1e-12)
+        np.testing.assert_allclose(js["j"],demo[1],atol=1e-12)
 
     def test_known_logistic_metrics(self):
         r=analyze_sample(sample())

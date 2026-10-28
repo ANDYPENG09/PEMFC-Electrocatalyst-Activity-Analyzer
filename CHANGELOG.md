@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — example curve shape and provenance
+
+- Redraw the synthetic CV example over 0.025–1.2 V with continuous scan reversals, a hydrogen-desorption peak and shoulder, hydrogen adsorption, Pt oxidation and broad Pt-oxide reduction. These are illustrative, not experimental curves.
+- Generate single-sample and workbench CV, O₂ and N₂ examples with explicitly synthetic origin. Numerical analysis behavior is unchanged.
+- Accept a required command-line Origin project path and optional output directory. The bundled PAAX fixture uses a generic synthetic filename.
+
 ## Unreleased — ECSA figure and calculation corrections
 
 - Replace the misleading README CV illustration with a synthetic Pt-like CV showing both hydrogen adsorption and desorption and a separate H-upd baseline/integration diagram. The two-sample demo now has distinct CVs and a cathodic branch with hydrogen adsorption and oxide reduction.

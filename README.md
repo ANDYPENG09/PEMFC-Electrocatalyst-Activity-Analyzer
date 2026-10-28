@@ -12,6 +12,8 @@ Current source: **v1.3.0 plus unreleased ECSA fixes**. One self-contained `index
 
 The last complete **anodic** sweep supplies the H-desorption curve. The green area is the positive current above the selected horizontal baseline between the integration limits (0.05–0.40 V vs RHE by default). Divide that area by scan rate to obtain charge, then divide by the H-upd reference charge and Pt loading. The baseline and limits must be checked for the experiment; a horizontal baseline is an approximation.
 
+The curve is an independently generated **synthetic** illustration. Its scan-direction and major Pt/C features were checked against public experimental examples, including [Yamada et al., Fig. 2](https://doi.org/10.5796/electrochemistry.22-66084); it is not digitized from that figure and is not a measurement or a universal PtCo/C fingerprint. The built-in single-sample and comparison examples are also synthetic.
+
 ### Synthetic sample comparison
 
 ![Synthetic two-sample comparison](docs/example-comparison.svg)
