@@ -63,22 +63,25 @@ const ECAnalysis = (() => {
   // Insert exact baseline crossings before clipping, so the shaded polygon and
   // its trapezoidal area match the positive part of the measured line segments.
   function hupdRegion(x,y,lo,hi,baseline){
+    const ends=Array.isArray(baseline)?baseline:[baseline,baseline];
+    if(ends.length!==2||!ends.every(Number.isFinite))throw Error('CV baseline requires one value or two finite endpoint values');
+    const baseAt=e=>ends[0]+(ends[1]-ends[0])*(e-lo)/(hi-lo);
     const points=[lo,...x.filter(v=>v>lo&&v<hi),hi],px=[],current=[];
     for(let i=0;i<points.length;i++){
       const value=interp(x,y,points[i],Infinity);
       if(i){
-        const previous=current.at(-1)-baseline, next=value-baseline;
+        const previous=current.at(-1)-baseAt(px.at(-1)), next=value-baseAt(points[i]);
         if(previous*next<0){
-          px.push(px.at(-1)+(points[i]-px.at(-1))*(-previous)/(next-previous));
-          current.push(baseline);
+          const crossing=px.at(-1)+(points[i]-px.at(-1))*(-previous)/(next-previous);
+          px.push(crossing);current.push(baseAt(crossing));
         }
       }
       px.push(points[i]);current.push(value);
     }
-    const upper=current.map(v=>Math.max(baseline,v));
+    const background=px.map(baseAt),upper=current.map((v,i)=>Math.max(background[i],v));
     let area=0;
-    for(let i=1;i<px.length;i++)area+=(px[i]-px[i-1])*(upper[i]+upper[i-1]-2*baseline)/2;
-    return {x:px,current,upper,area};
+    for(let i=1;i<px.length;i++)area+=(px[i]-px[i-1])*(upper[i]-background[i]+upper[i-1]-background[i-1])/2;
+    return {x:px,current,upper,baseline:background,area};
   }
   function cvAnalysis(cv,loading){
     const empty={ecsa_m2_g:null,stability_fraction:null,anodic_sweeps:0};if(!cv)return empty;
@@ -86,12 +89,14 @@ const ECAnalysis = (() => {
     if(![rate,q,lo,hi].every(Number.isFinite)||rate<=0||q<=0||lo>=hi)throw Error('Invalid CV integration parameters');
     const branches=sweeps(cv.E,cv.j).filter(([x])=>x.at(-1)>x[0]&&x[0]<=lo&&x.at(-1)>=hi).map(([x,y])=>{const keep=x.map((v,i)=>i===0||v>x[i-1]);return [x.filter((v,i)=>keep[i]),y.filter((v,i)=>keep[i])];});
     if(!branches.length)return empty;
-    const [x,y]=branches.at(-1),baseline=cv.baseline_mA_cm2??interp(x,y,hi,Infinity);
-    if(!Number.isFinite(baseline))throw Error('CV baseline must be finite');
+    if(Object.hasOwn(cv,'baseline_endpoints_mA_cm2')&&Object.hasOwn(cv,'baseline_mA_cm2'))throw Error('Specify one CV baseline, not both horizontal and sloped');
+    const [x,y]=branches.at(-1),baseline=Object.hasOwn(cv,'baseline_endpoints_mA_cm2')?cv.baseline_endpoints_mA_cm2:Object.hasOwn(cv,'baseline_mA_cm2')?cv.baseline_mA_cm2:interp(x,y,hi,Infinity);
+    if((Object.hasOwn(cv,'baseline_endpoints_mA_cm2')&&!Array.isArray(baseline))||(Object.hasOwn(cv,'baseline_mA_cm2')&&Array.isArray(baseline)))throw Error('CV baseline must match the selected mode');
     const sh=hupdRegion(x,y,lo,hi,baseline).area;
+    const endpoints=Array.isArray(baseline)?[...baseline]:[baseline,baseline];
     let stability=null;
     if(branches.length>=2){const [a,b]=branches.slice(-2),l=Math.max(a[0][0],b[0][0]),h=Math.min(a[0].at(-1),b[0].at(-1)),grid=Array.from({length:101},(_,i)=>l+(h-l)*i/100),ya=grid.map(v=>interp(...a,v,Infinity)),yb=grid.map(v=>interp(...b,v,Infinity));stability=Math.sqrt(mean(ya.map((v,i)=>(v-yb[i])**2)))/Math.max(Math.sqrt(mean(yb.map(v=>v*v))),1e-12);}
-    return {ecsa_m2_g:loading&&sh>0?100*sh/(q*rate*loading*1000):null,stability_fraction:stability,anodic_sweeps:branches.length,SH_mA_V_cm2:sh,baseline_mA_cm2:baseline};
+    return {ecsa_m2_g:loading&&sh>0?100*sh/(q*rate*loading*1000):null,stability_fraction:stability,anodic_sweeps:branches.length,SH_mA_V_cm2:sh,baseline_mA_cm2:endpoints[1],baseline_endpoints_mA_cm2:endpoints};
   }
   function fitLine(x,y){
     const mx=mean(x),my=mean(y),den=x.reduce((s,v)=>s+(v-mx)**2,0);if(x.length<2||den<1e-24)throw Error('Insufficient independent fit points');

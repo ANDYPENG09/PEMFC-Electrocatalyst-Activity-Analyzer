@@ -196,13 +196,24 @@
       <div class="field">
         <label>Baseline Subtraction Mode</label>
         <select id="baselineMode">
-          <option value="origin" selected>Origin-style &middot; End-plateau horizontal baseline</option>
+          <option value="origin" selected>Upper-limit horizontal baseline</option>
           <option value="manual">Manual horizontal baseline</option>
+          <option value="linear">Manual sloped baseline</option>
         </select>
       </div>
-      <div class="field">
-        <label>Manual Baseline Current Density (mA/cm²) <span class="hint">Manual mode only</span></label>
+      <div class="field" id="manualBaselineField" style="display:none">
+        <label for="baseline">Manual Baseline Current Density (mA/cm²)</label>
         <input type="number" id="baseline" step="any" placeholder="e.g. 0.030">
+      </div>
+    </div>
+    <div class="grid g-2" id="linearBaselineFields" style="display:none;margin-top:14px;">
+      <div class="field">
+        <label for="baselineStart">Baseline at Hupd lower limit (mA/cm²)</label>
+        <input type="number" id="baselineStart" step="any" placeholder="e.g. 0.025">
+      </div>
+      <div class="field">
+        <label for="baselineEnd">Baseline at Hupd upper limit (mA/cm²)</label>
+        <input type="number" id="baselineEnd" step="any" placeholder="e.g. 0.035">
       </div>
     </div>
   </details>
@@ -516,22 +527,25 @@ const ECAnalysis = (() => {
   // Insert exact baseline crossings before clipping, so the shaded polygon and
   // its trapezoidal area match the positive part of the measured line segments.
   function hupdRegion(x,y,lo,hi,baseline){
+    const ends=Array.isArray(baseline)?baseline:[baseline,baseline];
+    if(ends.length!==2||!ends.every(Number.isFinite))throw Error('CV baseline requires one value or two finite endpoint values');
+    const baseAt=e=>ends[0]+(ends[1]-ends[0])*(e-lo)/(hi-lo);
     const points=[lo,...x.filter(v=>v>lo&&v<hi),hi],px=[],current=[];
     for(let i=0;i<points.length;i++){
       const value=interp(x,y,points[i],Infinity);
       if(i){
-        const previous=current.at(-1)-baseline, next=value-baseline;
+        const previous=current.at(-1)-baseAt(px.at(-1)), next=value-baseAt(points[i]);
         if(previous*next<0){
-          px.push(px.at(-1)+(points[i]-px.at(-1))*(-previous)/(next-previous));
-          current.push(baseline);
+          const crossing=px.at(-1)+(points[i]-px.at(-1))*(-previous)/(next-previous);
+          px.push(crossing);current.push(baseAt(crossing));
         }
       }
       px.push(points[i]);current.push(value);
     }
-    const upper=current.map(v=>Math.max(baseline,v));
+    const background=px.map(baseAt),upper=current.map((v,i)=>Math.max(background[i],v));
     let area=0;
-    for(let i=1;i<px.length;i++)area+=(px[i]-px[i-1])*(upper[i]+upper[i-1]-2*baseline)/2;
-    return {x:px,current,upper,area};
+    for(let i=1;i<px.length;i++)area+=(px[i]-px[i-1])*(upper[i]-background[i]+upper[i-1]-background[i-1])/2;
+    return {x:px,current,upper,baseline:background,area};
   }
   function cvAnalysis(cv,loading){
     const empty={ecsa_m2_g:null,stability_fraction:null,anodic_sweeps:0};if(!cv)return empty;
@@ -539,12 +553,14 @@ const ECAnalysis = (() => {
     if(![rate,q,lo,hi].every(Number.isFinite)||rate<=0||q<=0||lo>=hi)throw Error('Invalid CV integration parameters');
     const branches=sweeps(cv.E,cv.j).filter(([x])=>x.at(-1)>x[0]&&x[0]<=lo&&x.at(-1)>=hi).map(([x,y])=>{const keep=x.map((v,i)=>i===0||v>x[i-1]);return [x.filter((v,i)=>keep[i]),y.filter((v,i)=>keep[i])];});
     if(!branches.length)return empty;
-    const [x,y]=branches.at(-1),baseline=cv.baseline_mA_cm2??interp(x,y,hi,Infinity);
-    if(!Number.isFinite(baseline))throw Error('CV baseline must be finite');
+    if(Object.hasOwn(cv,'baseline_endpoints_mA_cm2')&&Object.hasOwn(cv,'baseline_mA_cm2'))throw Error('Specify one CV baseline, not both horizontal and sloped');
+    const [x,y]=branches.at(-1),baseline=Object.hasOwn(cv,'baseline_endpoints_mA_cm2')?cv.baseline_endpoints_mA_cm2:Object.hasOwn(cv,'baseline_mA_cm2')?cv.baseline_mA_cm2:interp(x,y,hi,Infinity);
+    if((Object.hasOwn(cv,'baseline_endpoints_mA_cm2')&&!Array.isArray(baseline))||(Object.hasOwn(cv,'baseline_mA_cm2')&&Array.isArray(baseline)))throw Error('CV baseline must match the selected mode');
     const sh=hupdRegion(x,y,lo,hi,baseline).area;
+    const endpoints=Array.isArray(baseline)?[...baseline]:[baseline,baseline];
     let stability=null;
     if(branches.length>=2){const [a,b]=branches.slice(-2),l=Math.max(a[0][0],b[0][0]),h=Math.min(a[0].at(-1),b[0].at(-1)),grid=Array.from({length:101},(_,i)=>l+(h-l)*i/100),ya=grid.map(v=>interp(...a,v,Infinity)),yb=grid.map(v=>interp(...b,v,Infinity));stability=Math.sqrt(mean(ya.map((v,i)=>(v-yb[i])**2)))/Math.max(Math.sqrt(mean(yb.map(v=>v*v))),1e-12);}
-    return {ecsa_m2_g:loading&&sh>0?100*sh/(q*rate*loading*1000):null,stability_fraction:stability,anodic_sweeps:branches.length,SH_mA_V_cm2:sh,baseline_mA_cm2:baseline};
+    return {ecsa_m2_g:loading&&sh>0?100*sh/(q*rate*loading*1000):null,stability_fraction:stability,anodic_sweeps:branches.length,SH_mA_V_cm2:sh,baseline_mA_cm2:endpoints[1],baseline_endpoints_mA_cm2:endpoints};
   }
   function fitLine(x,y){
     const mx=mean(x),my=mean(y),den=x.reduce((s,v)=>s+(v-mx)**2,0);if(x.length<2||den<1e-24)throw Error('Insufficient independent fit points');
@@ -879,6 +895,22 @@ let lastAnodicSweep = null;
 let lastFullCycle = null;
 
 let ecsaResult=null;
+function updateBaselineFields(){
+  $('manualBaselineField').style.display=$('baselineMode').value==='manual'?'':'none';
+  $('linearBaselineFields').style.display=$('baselineMode').value==='linear'?'':'none';
+}
+function applyBaselineInputs(cv){
+  if($('baselineMode').value==='manual'){
+    const baseline=num('baseline');
+    if(!Number.isFinite(baseline))throw Error('Enter a finite manual baseline / 请填写有效手动基线');
+    cv.baseline_mA_cm2=baseline;
+  }else if($('baselineMode').value==='linear'){
+    const ends=[num('baselineStart'),num('baselineEnd')];
+    if(!ends.every(Number.isFinite))throw Error('Enter both finite baseline endpoint currents / 请填写两个有效的基线端点电流密度');
+    cv.baseline_endpoints_mA_cm2=ends;
+  }
+  return cv;
+}
 function calcECSA(){
   invalidateCv();
   try{
@@ -887,30 +919,25 @@ function calcECSA(){
     if(![lo,hi].every(Number.isFinite)||lo>=hi)throw Error('Invalid Hupd range / 积分范围无效');
     const rows=parse2col($('cvText').value,$('cvPotUnit').value,$('cvCurUnit').value);
     const X=rows.map(r=>r[0]),Y=rows.map(r=>r[1]*1000/A);
-    const cv={E:X,j:Y,scan_rate_V_s:v,q_mC_cm2:q,hupd_range_V:[lo,hi]};
-    if($('baselineMode').value==='manual'){
-      const baseline=num('baseline');
-      if(!Number.isFinite(baseline))throw Error('Enter a finite manual baseline / 请填写有效手动基线');
-      cv.baseline_mA_cm2=baseline;
-    }
+    const cv=applyBaselineInputs({E:X,j:Y,scan_rate_V_s:v,q_mC_cm2:q,hupd_range_V:[lo,hi]});
     const result=ECAnalysis.cvAnalysis(cv,m/1000);
     if(!Number.isFinite(result.SH_mA_V_cm2))throw Error('No anodic sweep covers the integration range / 没有完整覆盖积分范围的阳极扫描');
     const [sx,sy]=ECAnalysis.sweeps(X,Y).filter(([x])=>x.at(-1)>x[0]&&x[0]<=lo&&x.at(-1)>=hi).at(-1);
     const keep=sx.map((x,i)=>i===0||x>sx[i-1]),xx=sx.filter((_,i)=>keep[i]),yy=sy.filter((_,i)=>keep[i]);
-    const baseline=result.baseline_mA_cm2;
+    const baseline=result.baseline_endpoints_mA_cm2;
     const region=ECAnalysis.hupdRegion(xx,yy,lo,hi,baseline);
     lastFullCycle={X,Y};lastAnodicSweep=[xx,yy];ecsaResult=result;
     const SH=result.SH_mA_V_cm2,QH=SH/v,area=QH*A/q;
     $('o_SH').textContent=fmt(SH,5);$('o_QH').textContent=fmt(QH,4);
     $('o_ecsa').textContent=fmt(result.ecsa_m2_g,2);$('o_ecsa_cm2').textContent=fmt(area,3);$('o_rf').textContent=fmt(area/A,2);
-    $('cvMsg').textContent=`S_H = ${SH.toFixed(5)} mA·V/cm²; baseline = ${baseline.toFixed(5)} mA/cm²; ${$('baselineMode').value==='manual'?'manual / 手动':`j@${hi.toFixed(3)} V / 积分上限基线`}.`;
-    drawCvPlots(lo,hi,region,baseline);
+    $('cvMsg').textContent=`S_H = ${SH.toFixed(5)} mA·V/cm²; baseline endpoints / 基线端点 = ${baseline[0].toFixed(5)}, ${baseline[1].toFixed(5)} mA/cm².`;
+    drawCvPlots(lo,hi,region);
   }catch(e){$('cvMsg').textContent=e.message;}
   finally{calcORR();}
 }
 
 /* ===== Plotting ===== */
-function drawCvPlots(lo, hi, region, j_bg){
+function drawCvPlots(lo, hi, region){
   if (!lastFullCycle){
     $("cvPlotFull").innerHTML = "";
     $("cvPlotZoom").innerHTML = "";
@@ -922,12 +949,12 @@ function drawCvPlots(lo, hi, region, j_bg){
     title: "CV", xlabel: "E (V vs RHE)", ylabel: "J (mA/cm\u00B2)",
     regions: [{ x0: lo, x1: hi, color: "#0071e3" }]
   });
-  lastCvZoom = { region, j_bg };
+  lastCvZoom = { region };
   drawCvZoom();
 }
 function drawCvZoom(){
-  const {region,j_bg}=lastCvZoom;
-  const px=region.x, baselineY=px.map(() => j_bg);
+  const {region}=lastCvZoom;
+  const px=region.x, baselineY=region.baseline;
   svgChart($("cvPlotZoom"), [
     { x: px, y: region.current, color: "#0071e3", name: "Input anodic sweep" },
     { x: px, y: baselineY, color: "#d70015", dashed: true, name: "Baseline" }
@@ -1037,7 +1064,7 @@ $("lsvBtn").addEventListener("click", () => {
 /* ===== Clear ===== */
 $("cvClear").addEventListener("click", () => {
   invalidateCv();
-  $("cvText").value = ""; $("baseline").value = "";
+  $("cvText").value = ""; $("baseline").value = ""; $("baselineStart").value = ""; $("baselineEnd").value = "";
   ["o_SH","o_QH","o_ecsa","o_ecsa_cm2","o_rf"].forEach(id => $(id).textContent = "\u2014");
   $("cvMsg").textContent = "Cleared.";
   $("cvPlotFull").innerHTML = ""; $("cvPlotZoom").innerHTML = "";
@@ -1155,6 +1182,10 @@ $("exportCsv").addEventListener("click", () => {
   push("Hupd lower limit (V)", $("hlo").value);
   push("Hupd upper limit (V)", $("hhi").value);
   push("Baseline mode", $("baselineMode").value);
+  if(ecsaResult){
+    push("Baseline at lower limit (mA/cm²)", ecsaResult.baseline_endpoints_mA_cm2[0]);
+    push("Baseline at upper limit (mA/cm²)", ecsaResult.baseline_endpoints_mA_cm2[1]);
+  }
   push("Evaluation potential E (V)", $("Ep").value);
   push("j_lim evaluation potential (V)", $("jlimE").value);
   push("j @ E (mA/cm\u00B2)", $("jE").value);
@@ -1174,8 +1205,9 @@ $("exportCsv").addEventListener("click", () => {
 });
 
 /* ===== Linkage ===== */
-["vrate","vUnit","qspec","qUnit","inkConc","dropVol","ptFrac","area","hlo","hhi","baselineMode","baseline","cvPotUnit","cvCurUnit"].forEach(id =>
-  $(id).addEventListener("input", () => { computePtLoad(); calcECSA(); calcORR(); }));
+["vrate","vUnit","qspec","qUnit","inkConc","dropVol","ptFrac","area","hlo","hhi","baselineMode","baseline","baselineStart","baselineEnd","cvPotUnit","cvCurUnit"].forEach(id =>
+  $(id).addEventListener("input", () => { updateBaselineFields(); computePtLoad(); calcECSA(); calcORR(); }));
+updateBaselineFields();
 ["jE","jlim","Ep","jlimE"].forEach(id => $(id).addEventListener("input", calcORR));
 document.querySelectorAll(".frac-tag").forEach(b =>
   b.addEventListener("click", () => {
@@ -1210,7 +1242,7 @@ document.querySelector('.frac-tag[data-f="30"]').classList.add("active");
 (() => {
   let samples=[],analysis=null,kl=null,selected=new Set();
   const historyKey='pemfc-sample-history-v1';
-  const inputIds=['cvText','lsvText','n2Text','cvPotUnit','cvCurUnit','o2PotUnit','o2CurUnit','n2CurUnit','vrate','vUnit','qspec','qUnit','area','inkConc','dropVol','ptFrac','hlo','hhi','baselineMode','baseline','Ep','jlimMode','jlimE','wbRef','wbPH','wbRu','wbWidth','wbSlope','wbTafelLo','wbTafelHi'];
+  const inputIds=['cvText','lsvText','n2Text','cvPotUnit','cvCurUnit','o2PotUnit','o2CurUnit','n2CurUnit','vrate','vUnit','qspec','qUnit','area','inkConc','dropVol','ptFrac','hlo','hhi','baselineMode','baseline','baselineStart','baselineEnd','Ep','jlimMode','jlimE','wbRef','wbPH','wbRu','wbWidth','wbSlope','wbTafelLo','wbTafelHi'];
   const T=(en,zh)=>window.uiT?window.uiT(en,zh):en+' · '+zh;
   function saveHistory(){
     try{localStorage.setItem(historyKey,JSON.stringify({history_version:1,samples,selected:[...selected]}));$('wbStorage').textContent=T('History saved locally.','历史已保存在本地。');}
@@ -1229,7 +1261,7 @@ document.querySelector('.frac-tag[data-f="30"]').classList.add("active");
     if(!sample.input_state){$('wbMessage').textContent=T('This imported sample has no original input form; its curves remain available for comparison.','此导入样品没有原始输入表单；仍可参与曲线比较。');return;}
     $('cvClear').click();$('lsvClear').click();$('n2Clear').click();
     for(const id of inputIds)if(Object.hasOwn(sample.input_state,id))$(id).value=sample.input_state[id];
-    $('wbName').value=sample.sample_id;computePtLoad();
+    $('wbName').value=sample.sample_id;updateBaselineFields();computePtLoad();
     if($('cvText').value.trim())calcECSA();if($('lsvText').value.trim())$('lsvBtn').click();
     $('wbMessage').textContent=T('Inputs restored. Change the name to save a new snapshot.','已恢复输入；如需另存快照，请修改样品名称。');
   }
@@ -1270,8 +1302,7 @@ document.querySelector('.frac-tag[data-f="30"]').classList.add("active");
 
     }
     if($('cvText').value.trim()){
-      s.cv={...read('cvText','cvPotUnit','cvCurUnit'),scan_rate_V_s:scanRateV(),q_mC_cm2:qspecCmC(),hupd_range_V:[num('hlo'),num('hhi')]};
-      if($('baselineMode').value==='manual'){if(!Number.isFinite(num('baseline')))throw Error('Enter a finite manual baseline / 请填写有效手动基线');s.cv.baseline_mA_cm2=num('baseline');}
+      s.cv=applyBaselineInputs({...read('cvText','cvPotUnit','cvCurUnit'),scan_rate_V_s:scanRateV(),q_mC_cm2:qspecCmC(),hupd_range_V:[num('hlo'),num('hhi')]});
     }s.input_state=Object.fromEntries(inputIds.map(id=>[id,$(id).value]));s.saved_at=new Date().toISOString();return s;
   }
   function render(){
@@ -1396,8 +1427,8 @@ document.querySelector('.frac-tag[data-f="30"]').classList.add("active");
     ['Scan Rate','扫描速率'],['Pt Monolayer Charge q','Pt 单层氢吸附电荷 q'],['RDE Geometric Area (cm²)','RDE 几何面积 (cm²)'],
     ['Ink Concentration (mg/mL)','墨水浓度 (mg/mL)'],['Drop Volume (µL)','滴涂体积 (µL)'],['Pt Weight Fraction (%)','Pt 质量分数 (%)'],['→ Pt Loading (µg/cm²)','→ Pt 载量 (µg/cm²)'],
     ['Advanced Integration Settings','高级积分设置'],['Hupd Lower Limit (V)','Hupd 下限 (V)'],['Hupd Upper Limit (V)','Hupd 上限 (V)'],
-    ['Baseline Subtraction Mode','基线扣除方式'],['Origin-style · End-plateau horizontal baseline','Origin 风格 · 末端平台水平基线'],['Manual horizontal baseline','手动水平基线'],
-    ['Manual Baseline Current Density (mA/cm²)','手动基线电流密度 (mA/cm²)'],['Manual mode only','仅手动模式'],
+    ['Baseline Subtraction Mode','基线扣除方式'],['Upper-limit horizontal baseline','积分上限水平基线'],['Manual horizontal baseline','手动水平基线'],['Manual sloped baseline','手动倾斜基线'],
+    ['Manual Baseline Current Density (mA/cm²)','手动基线电流密度 (mA/cm²)'],['Baseline at Hupd lower limit (mA/cm²)','Hupd 下限处的基线电流密度 (mA/cm²)'],['Baseline at Hupd upper limit (mA/cm²)','Hupd 上限处的基线电流密度 (mA/cm²)'],
     ['Potential','电位'],['Current','电流'],['CV Data (two columns: potential, current; space/comma/tab separated)','CV 数据（两列：电位、电流；空格/逗号/Tab 分隔）'],
     ['Calculate ECSA','计算 ECSA'],['Download CV Plot','下载 CV 图'],['Clear CV','清空 CV'],['Load Example Data','载入示例数据'],
     ['Example curves are synthetic illustrations, not experimental data.','示例曲线为合成示意，不是实验数据。'],
