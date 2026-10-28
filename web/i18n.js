@@ -13,6 +13,7 @@
     ['Potential','电位'],['Current','电流'],['CV Data (two columns: potential, current; space/comma/tab separated)','CV 数据（两列：电位、电流；空格/逗号/Tab 分隔）'],
     ['Calculate ECSA','计算 ECSA'],['Download CV Plot','下载 CV 图'],['Clear CV','清空 CV'],['Load Example Data','载入示例数据'],
     ['Example curves are synthetic illustrations, not experimental data.','示例曲线为合成示意，不是实验数据。'],
+    ['Example data are anonymized for demonstration.','示例数据已脱敏，仅用于演示。'],
     ['PNG transparent background (applies to CV & LSV exports)','PNG 透明背景（适用于 CV 与 LSV 导出）'],['Hupd plot X-axis range (V):','Hupd 图 X 轴范围 (V)：'],['Min','最小'],['Max','最大'],['Apply X-axis','应用 X 轴'],
     ['ORR Mass Activity / Specific Activity','ORR 质量活性 / 比活性'],['Current Density j @ E (mA/cm²)','指定电位下电流密度 j (mA/cm²)'],['Evaluation Potential E (V vs RHE)','评价电位 E (V vs RHE)'],
     ['Auto diffusion plateau (recommended)','自动扩散平台（推荐）'],['Manual potential (legacy)','手动电位（兼容模式）'],['Evaluation Potential (V)','评价电位 (V)'],

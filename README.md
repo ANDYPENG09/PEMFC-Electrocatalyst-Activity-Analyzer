@@ -8,11 +8,11 @@ Current source: **v1.3.0 plus unreleased ECSA fixes**. One self-contained `index
 
 ### How H-upd ECSA is calculated
 
-![Synthetic Pt-like CV and H-upd desorption integration](docs/ecsa-hupd.svg)
+![Anonymized example CV and H-upd desorption integration](docs/ecsa-hupd.svg)
 
 The last complete **anodic** sweep supplies the H-desorption curve. The green area is the positive current above the baseline between the integration limits (0.05–0.40 V vs RHE by default). Choose the upper-limit horizontal baseline, a manual horizontal baseline, or a manual sloped baseline defined by its current densities at both limits. Divide that area by scan rate to obtain charge, then divide by the H-upd reference charge and Pt loading. Select the limits and background using the experimental protocol; the figure shows the horizontal option.
 
-The curve is an independently generated **synthetic** illustration. Its scan-direction and major Pt/C features were checked against public experimental examples, including [Yamada et al., Fig. 2](https://doi.org/10.5796/electrochemistry.22-66084); it is not digitized from that figure and is not a measurement or a universal PtCo/C fingerprint. The built-in single-sample and comparison examples are also synthetic.
+This figure uses the same anonymized **Example** CV data as the single-sample calculator. The data are an example, not a universal catalyst fingerprint or a performance claim. The reference electrode, scan rate, loading, baseline and integration limits must be verified for each experiment.
 
 ### Synthetic sample comparison
 
