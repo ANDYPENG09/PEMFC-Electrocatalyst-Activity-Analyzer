@@ -2,7 +2,7 @@
 (() => {
   let samples=[],analysis=null,kl=null,selected=new Set();
   const historyKey='pemfc-sample-history-v1';
-  const inputIds=['cvText','lsvText','n2Text','cvPotUnit','cvCurUnit','o2PotUnit','o2CurUnit','n2CurUnit','vrate','vUnit','qspec','qUnit','area','inkConc','dropVol','ptFrac','hlo','hhi','baselineMode','baseline','Ep','jlimMode','jlimE','wbRef','wbPH','wbRu','wbWidth','wbSlope','wbTafelLo','wbTafelHi'];
+  const inputIds=['cvText','lsvText','n2Text','cvPotUnit','cvCurUnit','o2PotUnit','o2CurUnit','n2CurUnit','vrate','vUnit','qspec','qUnit','area','inkConc','dropVol','ptFrac','hlo','hhi','baselineMode','baseline','baselineStart','baselineEnd','Ep','jlimMode','jlimE','wbRef','wbPH','wbRu','wbWidth','wbSlope','wbTafelLo','wbTafelHi'];
   const T=(en,zh)=>window.uiT?window.uiT(en,zh):en+' · '+zh;
   function saveHistory(){
     try{localStorage.setItem(historyKey,JSON.stringify({history_version:1,samples,selected:[...selected]}));$('wbStorage').textContent=T('History saved locally.','历史已保存在本地。');}
@@ -21,7 +21,7 @@
     if(!sample.input_state){$('wbMessage').textContent=T('This imported sample has no original input form; its curves remain available for comparison.','此导入样品没有原始输入表单；仍可参与曲线比较。');return;}
     $('cvClear').click();$('lsvClear').click();$('n2Clear').click();
     for(const id of inputIds)if(Object.hasOwn(sample.input_state,id))$(id).value=sample.input_state[id];
-    $('wbName').value=sample.sample_id;computePtLoad();
+    $('wbName').value=sample.sample_id;updateBaselineFields();computePtLoad();
     if($('cvText').value.trim())calcECSA();if($('lsvText').value.trim())$('lsvBtn').click();
     $('wbMessage').textContent=T('Inputs restored. Change the name to save a new snapshot.','已恢复输入；如需另存快照，请修改样品名称。');
   }
@@ -62,8 +62,7 @@
 
     }
     if($('cvText').value.trim()){
-      s.cv={...read('cvText','cvPotUnit','cvCurUnit'),scan_rate_V_s:scanRateV(),q_mC_cm2:qspecCmC(),hupd_range_V:[num('hlo'),num('hhi')]};
-      if($('baselineMode').value==='manual'){if(!Number.isFinite(num('baseline')))throw Error('Enter a finite manual baseline / 请填写有效手动基线');s.cv.baseline_mA_cm2=num('baseline');}
+      s.cv=applyBaselineInputs({...read('cvText','cvPotUnit','cvCurUnit'),scan_rate_V_s:scanRateV(),q_mC_cm2:qspecCmC(),hupd_range_V:[num('hlo'),num('hhi')]});
     }s.input_state=Object.fromEntries(inputIds.map(id=>[id,$(id).value]));s.saved_at=new Date().toISOString();return s;
   }
   function render(){
