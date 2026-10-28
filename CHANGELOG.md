@@ -5,6 +5,7 @@
 - Replace the misleading README CV illustration with a synthetic Pt-like CV showing both hydrogen adsorption and desorption and a separate H-upd baseline/integration diagram. The two-sample demo now has distinct CVs and a cathodic branch with hydrogen adsorption and oxide reduction.
 - Preserve the measured anodic curve below the baseline in the integration plot. Insert exact line/baseline crossings before positive-only integration, so shading and numerical charge agree. Results can change when a segment crosses the baseline.
 - Fix the legacy Python `ecsa_from_hupd` Pt area and roughness factor, which were 1,000 times too large owing to a mC/C mismatch. Its specific ECSA result was not affected by that unit error. The legacy two-sweep function requires baseline-corrected input.
+- Correct the legacy Python two-sweep turning point and interpolate its requested integration boundaries; reject sweeps that do not cover the full interval.
 - Correct the synthetic CSV/PAAX CV voltage range and scan-direction dependence. Keep the CSV and PAAX data chains aligned.
 - Clarify that a horizontal baseline is an approximation and correct the stale v1.2.2 version labels and overstated standards-compatibility language.
 
