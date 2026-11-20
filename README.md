@@ -2,9 +2,9 @@
 
 Offline **CV / ORR analysis** for catalyst R&D: ECSA, mass activity, specific activity, QC, multi-sample comparisons and multi-rpm Koutecký–Levich fitting.
 
-**[Open the workbench](https://andypeng09.github.io/PEMFC-Electrocatalyst-Activity-Analyzer/)** · **[Download current HTML](https://raw.githubusercontent.com/ANDYPENG09/PEMFC-Electrocatalyst-Activity-Analyzer/main/index.html)** · [Releases](https://github.com/ANDYPENG09/PEMFC-Electrocatalyst-Activity-Analyzer/releases) · [Methods and export schema](docs/methods-and-exports.md)
+**[Open the workbench](https://andypeng09.github.io/PEMFC-Electrocatalyst-Activity-Analyzer/)** · **[Download the latest release HTML](https://github.com/ANDYPENG09/PEMFC-Electrocatalyst-Activity-Analyzer/releases/latest/download/index.html)** · [Releases](https://github.com/ANDYPENG09/PEMFC-Electrocatalyst-Activity-Analyzer/releases) · [Methods and export schema](docs/methods-and-exports.md)
 
-Current source: **v1.3.0 plus unreleased ECSA fixes**. One self-contained `index.html`, English / 中文, no installation or data upload. Download/save the HTML to use offline; a raw download link may display source text in your browser. The v1.3.0 release asset predates the ECSA fixes: use the current HTML or workbench above.
+**v1.3.1** includes the Pine AfterMath PAAX import fix and measured CV integration limits. Open the self-contained `index.html` in a browser to work offline in English or 中文.
 
 ### How H-upd ECSA is calculated
 
@@ -73,7 +73,7 @@ Join `results.csv` to an experimental-design table by `sample_id`, retaining QC 
 
 **Clear O₂ LSV** preserves N₂ background data for reuse. **Clear N₂ Background** preserves the O₂ LSV data. Both actions clear the previous corrected plot and ORR results; run extraction again after updating the input. Restoring a saved sample replaces both inputs with that sample’s saved data.
 
-### v1.3.0 — direct PAAX import
+### Direct PAAX import
 
 Open **Import Pine AfterMath PAAX**, choose a `.paax` file, select a potential/current trace, then choose **Load into CV**, **Load into O₂ LSV**, or **Load into N₂ Background**. The offline HTML reads units and points from the trace or its `<data>` block, preserves point order, and converts supported explicit units to V/A. AfterMath data with `qty_kind=potential/current` and no explicit unit symbol use V/A. The selector shows the originating study when available. Loading a CV with supported AfterMath scan-rate metadata fills the scan rate. Confirm the potential reference and catalyst loading before calculation.
 

@@ -1,16 +1,24 @@
 # Changelog
 
-## Unreleased — restore anonymized example
+## v1.3.1 — 2026-11-20
+
+### Pine AfterMath import and CV integration
+
+- Read trace unit metadata from AfterMath data blocks and keep valid entries usable when another trace lacks metadata.
+- Label traces with their study names and populate CV scan rate when supported metadata is present.
+- Report the measured anodic sweep range when a requested integration limit exceeds the available data. Offer an explicit adjustment for a gap within one recorded step.
+
+### Restored anonymized example
 
 Restore the original anonymized CV, N₂ and O₂ example data under the generic sample name Example. The ECSA and CV/ORR illustrations use those same data; the separate two-sample workbench demo remains synthetic.
 
-## Unreleased — example curve shape and provenance
+### Example curve shape and provenance
 
 - Redraw the synthetic CV example over 0.025–1.2 V with continuous scan reversals, a hydrogen-desorption peak and shoulder, hydrogen adsorption, Pt oxidation and broad Pt-oxide reduction. These are illustrative, not experimental curves.
 - Generate single-sample and workbench CV, O₂ and N₂ examples with explicitly synthetic origin. Numerical analysis behavior is unchanged.
 - Accept a required command-line Origin project path and optional output directory. The bundled PAAX fixture uses a generic synthetic filename.
 
-## Unreleased — ECSA figure and calculation corrections
+### ECSA figure and calculation corrections
 
 - Replace the misleading README CV illustration with a synthetic Pt-like CV showing both hydrogen adsorption and desorption and a separate H-upd baseline/integration diagram. The two-sample demo now has distinct CVs and a cathodic branch with hydrogen adsorption and oxide reduction.
 - Preserve the measured anodic curve below the baseline in the integration plot. Insert exact line/baseline crossings before positive-only integration, so shading and numerical charge agree. Results can change when a segment crosses the baseline.
