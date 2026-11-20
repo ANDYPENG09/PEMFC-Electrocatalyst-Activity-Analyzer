@@ -33,3 +33,11 @@ class PaaxTests(unittest.TestCase):
         for xml in ['<DAB>', '<DAB/>', '<!DOCTYPE DAB><DAB/>']:
             with self.assertRaises(ValueError):
                 self.read_text(xml)
+
+    def test_aftermath_trace_data_wrapper(self):
+        result = self.read_text('''<DAB_node_list><DAB_node type="trace"><name>CV</name><data>
+            <X_units qty_kind="potential"/><Y_units qty_kind="current"/>
+            <points quantity="2"><X_data>0.1,0.2</X_data><Y_data>0,0.001</Y_data></points>
+            </data></DAB_node></DAB_node_list>''')
+        self.assertEqual((result['CV']['xunit'], result['CV']['yunit']), ('potential', 'current'))
+        np.testing.assert_equal(result['CV']['X'], [0.1, 0.2])

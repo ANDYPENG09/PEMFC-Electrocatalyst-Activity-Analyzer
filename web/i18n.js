@@ -1,7 +1,8 @@
 /* Offline bilingual UI layer. English source text remains canonical; switch is reversible. */
 (() => {
   const exact = new Map([
-    ['Import Autolab NOVA PAAX','导入 Autolab NOVA PAAX'],['PAAX file','PAAX 文件'],['Select PAAX trace','选择 PAAX 曲线'],['Load into CV','导入 CV'],['Load into O₂ LSV','导入 O₂ LSV'],['Load into N₂ Background','导入 N₂ 背景'],
+    ['Import Pine AfterMath PAAX','导入 Pine AfterMath PAAX'],['PAAX file','PAAX 文件'],['Select PAAX trace','选择 PAAX 曲线'],['Load into CV','导入 CV'],['Load into O₂ LSV','导入 O₂ LSV'],['Load into N₂ Background','导入 N₂ 背景'],
+    ['Use measured integration limits','使用实测积分界限'],
     ['Read PAAX files directly, select a potential/current trace, then load it into CV, O₂ LSV or N₂ background. Imported values use V and A. Confirm scan rate, reference and loading before calculation.','直接读取 PAAX，选择电位/电流曲线后导入 CV、O₂ LSV 或 N₂ 背景；导入值使用 V 和 A。计算前请确认扫描速率、参比和载量。'],
     ['Method note','方法说明'],
     ['Electrochemical Surface Area (ECSA · Hupd Method)','电化学活性表面积（ECSA · Hupd 法）'],
