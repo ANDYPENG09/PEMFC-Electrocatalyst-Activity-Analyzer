@@ -44,7 +44,7 @@ History is stored in the current browser. JSON backup is the portable copy to ke
 | Multi-sample workflow | Naming, history, restore inputs, CV/LSV overlays and selective figures |
 | Multi-rpm K–L | Signed fit, R², kinetic current; optional n with supplied electrolyte constants |
 | Exports | Exact plotted points, per-sample metrics, units, settings and QC |
-| Existing Python utilities | Autolab `.paax`, Origin `.opju`, formulas and plotting |
+| Existing Python utilities | Pine AfterMath `.paax`, Origin `.opju`, formulas and plotting |
 
 The workbench does not silently substitute `min(j)` for a diffusion plateau. QC thresholds are screening heuristics; they do not certify standards compliance. ECSA is a method-dependent estimate, and transport-limited activity estimates need review.
 
@@ -75,4 +75,6 @@ Join `results.csv` to an experimental-design table by `sample_id`, retaining QC 
 
 ### v1.3.0 — direct PAAX import
 
-Open **Import Autolab NOVA PAAX**, choose a `.paax` file, select a potential/current trace, then choose **Load into CV**, **Load into O₂ LSV**, or **Load into N₂ Background**. No Origin or Python is required by the HTML. Multi-block point order is preserved, duplicate names receive suffixes, and supported explicit units are converted to V/A. When unit labels are absent, `qty_kind=potential/current` is interpreted as V/A, matching the Python reader convention. Confirm the scan rate, potential reference and catalyst loading yourself; they are not inferred from trace names. Import replaces only the chosen input, preserves the other raw dataset and clears obsolete calculated results. The bundled PAAX fixture is synthetic demonstration data.
+Open **Import Pine AfterMath PAAX**, choose a `.paax` file, select a potential/current trace, then choose **Load into CV**, **Load into O₂ LSV**, or **Load into N₂ Background**. The offline HTML reads units and points from the trace or its `<data>` block, preserves point order, and converts supported explicit units to V/A. AfterMath data with `qty_kind=potential/current` and no explicit unit symbol use V/A. The selector shows the originating study when available. Loading a CV with supported AfterMath scan-rate metadata fills the scan rate. Confirm the potential reference and catalyst loading before calculation.
+
+ECSA requires an anodic sweep that covers both integration limits. If a limit is outside the measured range by at most one local sampling step, the calculator can use the available interval after you click **Use measured integration limits**. For a manual sloped baseline, enter the limits and their corresponding baseline currents together. Use the same limits when comparing ECSA across samples.

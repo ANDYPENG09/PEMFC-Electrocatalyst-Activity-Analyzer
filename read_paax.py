@@ -1,7 +1,7 @@
 """
-read_paax.py —— 直接读取 Autolab NOVA 的 .paax 原始数据文件（无需 Origin）
+read_paax.py —— 直接读取 Pine AfterMath 的 .paax 原始数据文件（无需 Origin）
 =====================================================================
-.paax 是 Autolab NOVA 的 DAB(XML) 数据库格式。每个 <DAB_node type="trace">
+.paax 是 Pine AfterMath 的 DAB(XML) 归档格式。每个 <DAB_node type="trace">
 即一条实验曲线，电位(X)/电流(Y)以逗号分隔纯文本存于 <X_data>/<Y_data>，
 并带单位信息 (X_units/Y_units 的 qty_kind，如 potential / current)。
 
@@ -46,6 +46,10 @@ def read_paax(path: str) -> dict:
             name = f"{base} ({suffix})"
             suffix += 1
         xu, yu = node.find("X_units"), node.find("Y_units")
+        if xu is None:
+            xu = node.find("data/X_units")
+        if yu is None:
+            yu = node.find("data/Y_units")
         xkind = xu.get("qty_kind", "?") if xu is not None else "?"
         ykind = yu.get("qty_kind", "?") if yu is not None else "?"
         xs, ys = [], []

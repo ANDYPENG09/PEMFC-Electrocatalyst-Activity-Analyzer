@@ -44,6 +44,24 @@ const tick=()=>new Promise(r=>setTimeout(r,20));
  click('paaxN2');assert.equal(el('lsvText').value,'0.1,0.001\n0.2,0.002');
  assert.equal(el('n2Text').value,'0.1,0.001\n0.2,0.002\n0.3,0.003');assert.equal(el('o2PotUnit').value,'V');
  click('paaxCv');assert.equal(el('cvText').value,el('n2Text').value);assert.equal(el('cvCurUnit').value,'A');
+ // AfterMath stores trace units and rate under data, and links studies by index.
+ const pine='<DAB_node_list><DAB_node type="study" index="1"><name>CV%20test</name></DAB_node><DAB_node type="plot" index="2" parent="1"/><DAB_node type="trace" parent="2"><name>Current%20vs%20Potential</name><data><X_units qty_kind="potential"/><Y_units qty_kind="current"/><points quantity="5"><X_data>0.1,0.052,0.057,0.2,0.5</X_data><Y_data>0,0,0.00001,0.00002,0</Y_data></points><metadata><object_map><map_pair><tag><exp_param_tag name="sweep_rate"/></tag><value><measurement_box><value><f64>0.05</f64></value><unit><measurement_unit unit_name="volt_per_second" unit_prefix="milli"/></unit></measurement_box></value></map_pair></object_map></metadata></data></DAB_node><DAB_node type="trace" parent="2"/></DAB_node_list>';
+ const pineTraces=w.PAAX.parse(pine);
+ assert.equal(pineTraces[0].name,'CV test · Current vs Potential');
+ assert.equal(pineTraces[1].error,'Missing X_units or Y_units');
+ Object.defineProperty(el('paaxFile'),'files',{configurable:true,value:[{name:'pine.paax',text:async()=>pine}]});
+ el('paaxFile').dispatchEvent(new w.Event('change'));await tick();
+ assert.equal(el('paaxTrace').options[1].disabled,true);
+ click('paaxCv');assert.equal(el('vrate').value,'0.05');assert.equal(el('vUnit').value,'V/s');
+ click('cvBtn');assert(el('cvMsg').textContent.includes('0.052–0.5 V'));
+ assert.equal(el('hlo').value,'0.05');assert.equal(el('o_ecsa').textContent,'—');
+ assert.equal(el('cvUseCoveredRange').hidden,false);click('cvUseCoveredRange');
+ assert.equal(el('hlo').value,'0.052');assert(el('cvMsg').textContent.includes('0.052–0.4 V'));
+ assert(Number(el('o_ecsa').textContent)>0);assert.equal(el('cvUseCoveredRange').hidden,true);
+ el('hlo').value='0.04';click('cvBtn');assert.equal(el('cvUseCoveredRange').hidden,true);
+ el('hlo').value='0.05';click('cvBtn');assert.equal(el('cvUseCoveredRange').hidden,false);
+ el('cvText').dispatchEvent(new w.Event('input'));assert.equal(el('cvUseCoveredRange').hidden,true);
+ el('vrate').value='0.02';
  click('cvClear');click('lsvClear');click('n2Clear');
 
  click('wbDemo');await tick();assert.equal(el('wbTable').rows.length,3);
