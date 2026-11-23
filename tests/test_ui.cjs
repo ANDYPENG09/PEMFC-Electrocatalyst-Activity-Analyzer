@@ -4,10 +4,11 @@ const fs=require('node:fs'),assert=require('node:assert/strict');
 const html=fs.readFileSync('index.html','utf8');
 const errors=[],alerts=[],draws=[],downloads=[],svgExports=[];
 let canvases=[];
-function start(saved){
+function start(saved, appearance){
   const vc=new VirtualConsole();vc.on('jsdomError',e=>errors.push(e.message));
   const dom=new JSDOM(html,{url:'https://analyzer.test',runScripts:'dangerously',virtualConsole:vc,beforeParse(w){
     if(saved)w.localStorage.setItem('pemfc-sample-history-v1',saved);
+    if(appearance)w.localStorage.setItem('pemfc-appearance',appearance);
     w.alert=m=>alerts.push(m);w.confirm=()=>true;
     w.URL.createObjectURL=()=> 'blob:test';w.URL.revokeObjectURL=()=>{};
     w.HTMLAnchorElement.prototype.click=function(){downloads.push(this.download);};
@@ -22,6 +23,23 @@ const tick=()=>new Promise(r=>setTimeout(r,20));
  let dom=start(),w=dom.window,d=w.document;
  const el=id=>d.getElementById(id),click=id=>el(id).click();
  assert.equal(el('lsvData').open,true);
+ // Appearance is independent of language and does not replace the analysis form.
+ await tick();
+ const theme=el('themeSelect');
+ assert.equal(d.documentElement.dataset.theme,'clear');
+ assert.equal(theme.value,'clear');
+ assert.deepEqual(Array.from(theme.options,o=>o.value),['clear','blue','classic','editorial']);
+ const cvInput=el('cvText');
+ for(const value of ['blue','classic','editorial']){
+   theme.value=value;theme.dispatchEvent(new w.Event('change'));
+   assert.equal(d.documentElement.dataset.theme,value);assert.equal(el('cvText'),cvInput);
+ }
+ click('langToggle');assert.equal(d.documentElement.dataset.theme,'editorial');
+ click('langToggle');
+ const reopened=start(null,w.localStorage.getItem('pemfc-appearance'));
+ assert.equal(reopened.window.document.documentElement.dataset.theme,'editorial');
+ await tick();assert.equal(reopened.window.document.getElementById('themeSelect').value,'editorial');
+ reopened.window.close();
  // PAAX parsing: bundled file, multiple blocks, duplicate names, invalid arrays and units.
  const paax=fs.readFileSync('sample_data/synthetic-demo.paax','utf8');
  const parsed=w.PAAX.parse(paax);assert(parsed.length>=3);assert(parsed.every(t=>!t.error));

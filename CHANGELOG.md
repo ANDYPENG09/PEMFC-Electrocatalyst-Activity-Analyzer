@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.5.0 — 2026-11-23
+
+- Add four selectable appearances: Clear Glass, Blue Glass, Classic, and Editorial Grid. Restore the selected appearance independently of language.
+
 ## v1.4.1 — 2026-11-23
 
 - Give the Pt monolayer charge unit enough space to display in full on desktop and narrow screens.

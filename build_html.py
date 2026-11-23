@@ -8,7 +8,9 @@ ROOT=Path(__file__).resolve().parent
 def build(check=False):
     path=ROOT/"index.html"
     old=path.read_text(encoding="utf-8")
-    glass="<!-- GLASS CSS START -->\n<style>\n"+(ROOT/"web/glass.css").read_text(encoding="utf-8").rstrip()+"\n</style>\n<!-- GLASS CSS END -->"
+    styles="\n\n".join((ROOT/"web"/name).read_text(encoding="utf-8").rstrip() for name in ("glass.css","themes.css"))
+    glass="<!-- GLASS CSS START -->\n<style>\n"+styles+"\n</style>\n<!-- GLASS CSS END -->"
+    theme="<!-- THEME SCRIPT START -->\n<script>\n"+(ROOT/"web/theme.js").read_text(encoding="utf-8").rstrip()+"\n</script>\n<!-- THEME SCRIPT END -->"
     html=(ROOT/"web/workbench.html").read_text(encoding="utf-8").strip()
     example_text=(ROOT/"web/example.json").read_text(encoding="utf-8").strip()
     if "</script" in example_text.lower(): raise ValueError("Unsafe example data")
@@ -19,7 +21,8 @@ def build(check=False):
     ui="<!-- WORKBENCH SCRIPT START -->\n<script>\n"+(ROOT/"web/workbench.js").read_text(encoding="utf-8")+"\n</script>\n<!-- WORKBENCH SCRIPT END -->"
     paax="<!-- PAAX SCRIPT START -->\n<script>\n"+(ROOT/"web/paax.js").read_text(encoding="utf-8")+"\n</script>\n<!-- PAAX SCRIPT END -->"
     new=old
-    for start,end,content,anchor in [("GLASS CSS START","GLASS CSS END",glass,"</head>"),
+    for start,end,content,anchor in [("THEME SCRIPT START","THEME SCRIPT END",theme,"<!-- GLASS CSS START -->"),
+                                     ("GLASS CSS START","GLASS CSS END",glass,"</head>"),
                                      ("WORKBENCH START","WORKBENCH END",html,"</main>"),
                                      ("EXAMPLE DATA START","EXAMPLE DATA END",example,"<!-- DEMO SCRIPT START -->"),
                                      ("ANALYSIS CORE START","ANALYSIS CORE END",core,"<script>"),

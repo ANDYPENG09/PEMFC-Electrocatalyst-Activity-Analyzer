@@ -1,6 +1,8 @@
 /* Offline bilingual UI layer. English source text remains canonical; switch is reversible. */
 (() => {
   const exact = new Map([
+    ['Appearance','外观'],['Clear Glass','通透玻璃'],['Blue Glass','蓝紫玻璃'],
+    ['Classic','经典白'],['Editorial Grid','版式网格'],
     ['PEMFC Electrocatalyst Activity Analyzer','PEMFC 电催化剂活性分析器'],
     ['CV / ECSA · ORR activity · Koutecký–Levich','CV / ECSA · ORR 活性 · Koutecký–Levich'],
     ['Skip to analysis','跳转至分析'],['Measurement settings','测量参数'],['Results','结果'],['Workbench','工作台'],
@@ -108,9 +110,9 @@
   function toggle(){lang=lang==='zh'?'en':'zh';try{localStorage.setItem('pemfc-ui-lang',lang);}catch(e){}apply();}
   window.uiLang=()=>lang;
   window.uiT=(en,zh)=>lang==='zh'?zh:en;
-  const header=document.querySelector('.hero');
-  if(header){
-    const b=document.createElement('button');b.id='langToggle';b.className='btn btn-secondary';b.type='button';b.addEventListener('click',toggle);header.appendChild(b);
+  const tools=document.querySelector('.hero-tools');
+  if(tools){
+    const b=document.createElement('button');b.id='langToggle';b.className='btn btn-secondary';b.type='button';b.addEventListener('click',toggle);tools.appendChild(b);
   }
   new MutationObserver(ms=>{if(applying)return;for(const m of ms)for(const n of m.addedNodes){if(n.nodeType===Node.TEXT_NODE&&n.nodeValue.trim())translateNode(n);else if(n.nodeType===Node.ELEMENT_NODE)apply(n);}}).observe(document.body,{subtree:true,childList:true});
   apply();
