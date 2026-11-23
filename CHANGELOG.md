@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.5.2 — 2026-11-23
+
+- Add a staggered PEMFC, CV, and ORR letter pattern to the Editorial Grid header.
+
 ## v1.5.1 — 2026-11-23
 
 - Balance the Editorial Grid title across lines in both languages.
