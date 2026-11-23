@@ -4,7 +4,7 @@ Offline **CV / ORR analysis** for catalyst R&D: ECSA, mass activity, specific ac
 
 **[Open the workbench](https://andypeng09.github.io/PEMFC-Electrocatalyst-Activity-Analyzer/)** · **[Download the latest release HTML](https://github.com/ANDYPENG09/PEMFC-Electrocatalyst-Activity-Analyzer/releases/latest/download/index.html)** · [Releases](https://github.com/ANDYPENG09/PEMFC-Electrocatalyst-Activity-Analyzer/releases) · [Methods and export schema](docs/methods-and-exports.md)
 
-**v1.4.0** introduces a glass workspace with section navigation and responsive layouts. Open the self-contained `index.html` in a browser to work offline in English or 中文.
+**v1.4.1** introduces a glass workspace with section navigation and responsive layouts. Open the self-contained `index.html` in a browser to work offline in English or 中文.
 
 ### How H-upd ECSA is calculated
 

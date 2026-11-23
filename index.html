@@ -135,8 +135,11 @@ main { min-width: 0; }
   border: 1px solid rgba(255, 255, 255, .85);
   border-radius: 18px;
 }
-.setup-pane { background: var(--inset); }
+.setup-pane { background: var(--inset); container-type: inline-size; }
 .setup-pane .loading-field { grid-column: 1 / -1; }
+@container (max-width: 345px) {
+  .setup-pane .charge-field { grid-column: 1 / -1; }
+}
 .import-pane {
   margin: 0;
   background: linear-gradient(135deg, rgba(241, 248, 255, .86), rgba(220, 230, 255, .65));
@@ -282,7 +285,7 @@ table.summary .u { display: block; color: var(--muted); font-size: 12px; font-we
 .inline-control { display: flex; align-items: center; gap: 5px; }
 .inline-control input { min-width: 0; flex: 1; padding-inline: 7px; }
 .inline-control select { width: 78px; flex: none; }
-.inline-control #qUnit { width: 86px; }
+.inline-control #qUnit { width: 108px; }
 fieldset { min-inline-size: 0; }
 #exportOptions { margin: 14px 0 0; padding: 10px 12px 6px; border: 1px solid var(--line2); border-radius: 14px; background: var(--inset); }
 #exportOptions legend { padding: 0 5px; color: var(--ink2); font-weight: 620; }
@@ -391,7 +394,7 @@ footer { margin-top: 12px; color: var(--muted); font-size: 12px; text-align: cen
             </select>
           </div>
         </div>
-        <div class="field">
+        <div class="field charge-field">
           <label for="qspec">Pt Monolayer Charge q<sub>spec</sub></label>
           <div class="inline-control">
             <input type="number" id="qspec" step="any" value="0.21">
@@ -677,7 +680,7 @@ footer { margin-top: 12px; color: var(--muted); font-size: 12px; text-align: cen
 <!-- WORKBENCH END -->
   </main>
 </div>
-<footer>v1.4.0 &middot; MIT License &middot; Author: ANDYPENG09 &middot; Pure HTML/JS &middot; Offline &middot; No Origin Required</footer>
+<footer>v1.4.1 &middot; MIT License &middot; Author: ANDYPENG09 &middot; Pure HTML/JS &middot; Offline &middot; No Origin Required</footer>
 
 </div>
 

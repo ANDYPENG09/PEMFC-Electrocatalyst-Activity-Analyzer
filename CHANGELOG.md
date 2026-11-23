@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.4.1 — 2026-11-23
+
+- Give the Pt monolayer charge unit enough space to display in full on desktop and narrow screens.
+
 ## v1.4.0 — 2026-11-23
 
 - Introduce the glass interface and section navigation, with side-by-side import and measurement settings on wider screens.
