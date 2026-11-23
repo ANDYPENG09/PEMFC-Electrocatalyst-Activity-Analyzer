@@ -22,6 +22,7 @@
     $('cvClear').click();$('lsvClear').click();$('n2Clear').click();
     for(const id of inputIds)if(Object.hasOwn(sample.input_state,id))$(id).value=sample.input_state[id];
     $('cvTrimBounds').checked=sample.input_state.cvTrimBounds===true;
+    loadCvInput($('cvText').value,sample.cv?.segment_starts??null,sample.cv?.cycle_number??null);
     $('wbName').value=sample.sample_id;updateBaselineFields();computePtLoad();
     if($('cvText').value.trim())calcECSA();if($('lsvText').value.trim())$('lsvBtn').click();
     $('wbMessage').textContent=T('Inputs restored. Change the name to save a new snapshot.','已恢复输入；如需另存快照，请修改样品名称。');
@@ -88,7 +89,8 @@
       const detail=text('details','',$('wbQC'));text('summary',`${s.sample_id} — ${s.qc.status}`,detail);
       if(s.cv?.hupd_effective_range_V){
         const used=s.cv.hupd_effective_range_V.join('–'),requested=s.cv.hupd_requested_range_V.join('–');
-        text('p',T(`Hupd used: ${used} V. Requested: ${requested} V.`,`Hupd 实际积分 ${used} V，设定 ${requested} V。`),detail);
+        const cycle=s.cv.cycle_number?`${cycleLabel(s.cv.cycle_number)} · `:'';
+        text('p',cycle+T(`Hupd used: ${used} V. Requested: ${requested} V.`,`Hupd 实际积分 ${used} V，设定 ${requested} V。`),detail);
       }
       if(s.plateau)text('p',`Plateau: ${display(s.plateau.start_V)}–${display(s.plateau.end_V)} V; median ${display(s.plateau.jlim_mA_cm2)}; MAD ${display(s.plateau.mad_mA_cm2)}; SD ${display(s.plateau.std_mA_cm2)} mA/cm²`,detail);
       if(s.metadata?.o2_points_outside_n2)text('p',`${s.metadata.o2_points_outside_n2} O2 endpoint(s) outside N2 coverage omitted · 已省略 N₂ 范围外的 O₂ 端点。`,detail);

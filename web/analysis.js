@@ -60,6 +60,25 @@ const ECAnalysis = (() => {
     for(let i=1;i<x.length;i++){const sign=Math.sign(x[i]-x[i-1]);if(sign&&direction&&sign!==direction){if(i-start>=3)out.push([x.slice(start,i),y.slice(start,i)]);start=i-1;}if(sign)direction=sign;}
     if(x.length-start>=3)out.push([x.slice(start),y.slice(start)]);return out;
   }
+  function cvSegments(x,y,starts){
+    if(!Array.isArray(starts)||starts[0]!==0||starts.length<2||!starts.every((i,k)=>Number.isInteger(i)&&i<x.length-1&&(!k||i>starts[k-1])))return sweeps(x,y);
+    if(x.length!==y.length||!x.every(Number.isFinite)||!y.every(Number.isFinite))throw Error('Invalid CV points');
+    return starts.map((start,i)=>{
+      const end=(starts[i+1]??(x.length-1))+1;
+      return [x.slice(start,end),y.slice(start,end)];
+    });
+  }
+  const isAnodic=([x])=>x.at(-1)>x[0];
+  function pairCycles(segments){
+    const cycles=[];
+    for(let i=0;i+1<segments.length;i+=2){
+      const first=segments[i],second=segments[i+1];
+      const [a]=first,[b]=second;
+      if((a.at(-1)-a[0])*(b.at(-1)-b[0])<0&&a.at(-1)===b[0])cycles.push([first,second]);
+    }
+    return cycles;
+  }
+  function cvCycles(x,y,starts){return pairCycles(cvSegments(x,y,starts));}
   // Insert exact baseline crossings before clipping, so the shaded polygon and
   // its trapezoidal area match the positive part of the measured line segments.
   function hupdRegion(x,y,lo,hi,baseline){
@@ -87,29 +106,41 @@ const ECAnalysis = (() => {
     const empty={ecsa_m2_g:null,stability_fraction:null,anodic_sweeps:0};if(!cv)return empty;
     const [requestedLo,requestedHi]=cv.hupd_range_V||[0.05,0.4],rate=cv.scan_rate_V_s??0.02,q=cv.q_mC_cm2??0.21;
     if(![rate,q,requestedLo,requestedHi].every(Number.isFinite)||rate<=0||q<=0||requestedLo>=requestedHi)throw Error('Invalid CV integration parameters');
-    const anodic=sweeps(cv.E,cv.j).filter(([x])=>x.at(-1)>x[0]);
+    const segments=cvSegments(cv.E,cv.j,cv.segment_starts),anodic=segments.filter(isAnodic);
+    const cycleNumber=cv.cycle_number??null;
+    const cycle=cycleNumber===null?null:pairCycles(segments)[cycleNumber-1];
+    if(cycleNumber!==null&&(!Number.isInteger(cycleNumber)||!cycle))throw Error('Selected CV cycle unavailable / 所选 CV 圈次不存在');
+    if(details&&cycle)details.cycle=cycle;
     const branches=[];
     let bestOverlap=0;
-    for(const [x,y] of anodic){
+    for(const segment of anodic){
+      const [x,y]=segment;
       const min=x[0],max=x.at(-1),lo=Math.max(min,requestedLo),hi=Math.min(max,requestedHi);
-      if(details&&hi-lo>0&&hi-lo>=bestOverlap){
+      if(details&&(!cycle||cycle.includes(segment))&&hi-lo>=bestOverlap){
         bestOverlap=hi-lo;
         details.measuredRange=[min,max];
-        details.overlap=[lo,hi];
+        if(hi>lo)details.overlap=[lo,hi];
       }
       if(lo>=hi)continue;
       if(min>requestedLo||max<requestedHi){
         if(cv.allow_endpoint_trim!==true)continue;
-        const firstStep=x.find(v=>v>min)-min,lastStep=max-x.findLast(v=>v<max);
+        const firstStep=x.find(v=>v>min&&v<=max)-min,lastStep=max-x.findLast(v=>v<max&&v>=min);
         if(min-requestedLo>Math.min(firstStep,0.005)+1e-12||requestedHi-max>Math.min(lastStep,0.005)+1e-12)continue;
       }
-      const keep=x.map((v,i)=>i===0||v>x[i-1]);
-      branches.push({x:x.filter((_,i)=>keep[i]),y:y.filter((_,i)=>keep[i]),lo,hi});
+      const xs=[min],ys=[y[0]];
+      for(let i=1;i<x.length;i++){
+        if(x[i]>xs.at(-1)&&x[i]<=max){xs.push(x[i]);ys.push(y[i]);}
+      }
+      branches.push({x:xs,y:ys,lo,hi,segment});
     }
-    if(details&&!details.measuredRange&&anodic.length)details.measuredRange=[anodic.at(-1)[0][0],anodic.at(-1)[0].at(-1)];
-    if(!branches.length)return empty;
+    const selected=cycle?branches.find(branch=>cycle.includes(branch.segment)):branches.at(-1);
+    if(details&&!details.measuredRange){
+      const sweep=(cycle?cycle.find(isAnodic):anodic.at(-1))?.[0];
+      if(sweep)details.measuredRange=[sweep[0],sweep.at(-1)];
+    }
+    if(!selected)return {...empty,...(cycle?{cycle_number:cycleNumber}:{})};
     if(Object.hasOwn(cv,'baseline_endpoints_mA_cm2')&&Object.hasOwn(cv,'baseline_mA_cm2'))throw Error('Specify one CV baseline, not both horizontal and sloped');
-    const {x,y,lo,hi}=branches.at(-1);
+    const {x,y,lo,hi}=selected;
     let baseline=Object.hasOwn(cv,'baseline_endpoints_mA_cm2')?cv.baseline_endpoints_mA_cm2:Object.hasOwn(cv,'baseline_mA_cm2')?cv.baseline_mA_cm2:interp(x,y,hi,Infinity);
     if((Object.hasOwn(cv,'baseline_endpoints_mA_cm2')&&!Array.isArray(baseline))||(Object.hasOwn(cv,'baseline_mA_cm2')&&Array.isArray(baseline)))throw Error('CV baseline must match the selected mode');
     const trimmed=lo!==requestedLo||hi!==requestedHi;
@@ -118,11 +149,11 @@ const ECAnalysis = (() => {
       baseline=[lo,hi].map(e=>start+(end-start)*(e-requestedLo)/(requestedHi-requestedLo));
     }
     const region=hupdRegion(x,y,lo,hi,baseline),sh=region.area;
-    if(details)Object.assign(details,{x,y,region});
+    if(details)details.region=region;
     const endpoints=Array.isArray(baseline)?[...baseline]:[baseline,baseline];
     let stability=null;
     if(branches.length>=2){const [a,b]=branches.slice(-2),l=Math.max(a.x[0],b.x[0]),h=Math.min(a.x.at(-1),b.x.at(-1));if(l<h){const grid=Array.from({length:101},(_,i)=>l+(h-l)*i/100),ya=grid.map(v=>interp(a.x,a.y,v,Infinity)),yb=grid.map(v=>interp(b.x,b.y,v,Infinity));stability=Math.sqrt(mean(ya.map((v,i)=>(v-yb[i])**2)))/Math.max(Math.sqrt(mean(yb.map(v=>v*v))),1e-12);}}
-    return {ecsa_m2_g:loading&&sh>0?100*sh/(q*rate*loading*1000):null,stability_fraction:stability,anodic_sweeps:branches.length,SH_mA_V_cm2:sh,baseline_mA_cm2:endpoints[1],baseline_endpoints_mA_cm2:endpoints,hupd_requested_range_V:[requestedLo,requestedHi],hupd_effective_range_V:[lo,hi]};
+    return {ecsa_m2_g:loading&&sh>0?100*sh/(q*rate*loading*1000):null,stability_fraction:stability,anodic_sweeps:branches.length,SH_mA_V_cm2:sh,baseline_mA_cm2:endpoints[1],baseline_endpoints_mA_cm2:endpoints,hupd_requested_range_V:[requestedLo,requestedHi],hupd_effective_range_V:[lo,hi],...(cycle?{cycle_number:cycleNumber}:{})};
   }
   function fitLine(x,y){
     const mx=mean(x),my=mean(y),den=x.reduce((s,v)=>s+(v-mx)**2,0);if(x.length<2||den<1e-24)throw Error('Insufficient independent fit points');
@@ -188,6 +219,6 @@ const ECAnalysis = (() => {
     return rows;
   }
   function exports(analysis){return {'analysis.json':JSON.stringify(analysis,null,2),'results.csv':csv(resultFields,analysis.samples.map(s=>({sample_id:s.sample_id,...s.metrics,qc_status:s.qc.status}))),'processed_cv.csv':csv(cvFields,analysis.samples.flatMap(s=>s.processed_cv)),'processed_orr.csv':csv(orrFields,analysis.samples.flatMap(s=>s.processed_orr)),'summary.csv':csv(summaryFields,summaryRows(analysis))};}
-  return {defaults,plateau,halfWave,kinetic,curve,interp,sweeps,hupdRegion,cvAnalysis,klFit,analyzeSample,analyzeBatch,exports,resultFields,summaryFields,summaryRows};
+  return {defaults,plateau,halfWave,kinetic,curve,interp,sweeps,cvCycles,hupdRegion,cvAnalysis,klFit,analyzeSample,analyzeBatch,exports,resultFields,summaryFields,summaryRows};
 })();
 if(typeof module!=='undefined')module.exports=ECAnalysis;

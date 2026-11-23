@@ -190,7 +190,11 @@
       while(used.has(name))name=`${base} (${n++})`;
       used.add(name);
       const date=child(byIndex.get(experiment),'start_time')?.textContent||child(study,'created')?.textContent||'';
-      const trace={name,label,date,xkind,ykind,xunit,yunit,scanRateV_s:scanRate(data),blocks,error};
+      const boundaries=child(data,'boundaries');
+      const segmentStarts=Array.from(boundaries?.children??[])
+        .filter(point=>point.getAttribute('segment_boundary')==='yes')
+        .map(point=>Number(point.getAttribute('point_ID'))-1);
+      const trace={name,label,date,xkind,ykind,xunit,yunit,scanRateV_s:scanRate(data),blocks,segmentStarts,error};
       const names=parents.map(nodeName).filter(Boolean).join(' / ').replaceAll('₂','2');
       const hint=names.match(/\b(CV|LSV|cyclic voltammogram|linear sweep voltammogram)\b/i)?.[0].toUpperCase();
       const type=known||(hint&&(hint==='CV'||hint.startsWith('CYCLIC')?'CV':'LSV'))||(!error&&sweepType(trace))||'';
@@ -342,7 +346,11 @@
       }
       byId('o2PotUnit').value='V';byId(target==='o2'?'o2CurUnit':'n2CurUnit').value='A';
     }
-    byId(input).value=data;byId(input).dispatchEvent(new Event('input',{bubbles:true}));
+    if(target==='cv')loadCvInput(data,trace.segmentStarts.length?trace.segmentStarts:null);
+    else{
+      byId(input).value=data;
+      byId(input).dispatchEvent(new Event('input',{bubbles:true}));
+    }
     byId('paaxMessage').textContent=T('Loaded ','已导入 ')+trace.label+` → ${targets.find(([,id])=>id===target)[2]} (${X.length}; V, A).`+rateMessage;
   }
   for(const [button,target] of targets){

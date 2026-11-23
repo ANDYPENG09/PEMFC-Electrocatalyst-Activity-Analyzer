@@ -3,6 +3,8 @@
   const exact = new Map([
     ['Import Pine AfterMath PAAX','导入 Pine AfterMath PAAX'],['PAAX file','PAAX 文件'],['Select PAAX trace','选择 PAAX 曲线'],['Load into CV','导入 CV'],['Load into O₂ LSV','导入 O₂ LSV'],['Load into N₂ Background','导入 N₂ 背景'],
     ['Use measured integration limits','使用实测积分界限'],
+    ['CV cycle for ECSA','ECSA 积分圈次'],['Automatic (cycle 2 when available)','自动（有第 2 圈时优先选用）'],
+    ['Last eligible anodic sweep','最后一条可积分阳极扫描'],
     ['Test run','测试轮次'],['All test runs','全部轮次'],['Curve group','曲线分组'],['All curves','全部曲线'],
     ['Activation CV','活化 CV'],['Other CV','其他 CV'],['LSV gas unconfirmed','LSV 气氛待确认'],['Technique unconfirmed','类型待确认'],
     ['Select a test run and trace. Check the scan rate, potential reference and Pt loading before calculation.','选择测试轮次并导入曲线。计算前核对扫速、电位参比与 Pt 载量。'],
@@ -77,7 +79,7 @@
     if(exact.has(s)) return exact.get(s);
     let out=s;
     for(const [en,zh] of phrases) out=out.split(en).join(zh);
-    out=out.replace(/^Download (.+)$/,'下载 $1')
+    out=out.replace(/^Download (.+)$/,'下载 $1').replace(/\bCycle (\d+)\b/g,'第 $1 圈')
       .replace(/^(\d+) sample\(s\) analyzed\. Results are snapshots\.$/,'已分析 $1 个样品；结果为当前快照。')
       .replace(/^Plateau:/,'平台：').replace(/; median /g,'；中位数 ').replace(/; MAD /g,'；MAD ').replace(/; SD /g,'；SD ')
       .replace(/^Difference:/,'差异：').replace(/^Ratio:/,'比例：').replace(/ points\.$/,' 个点。');

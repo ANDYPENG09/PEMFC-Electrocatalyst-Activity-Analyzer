@@ -9,7 +9,7 @@ on:
 permissions:
   contents: write
 concurrency:
-  group: release-html-${{ github.event.release.tag_name || 'v1.3.2' }}
+  group: release-html-${{ github.event.release.tag_name || 'v1.3.3' }}
   cancel-in-progress: false
 jobs:
   publish:
@@ -34,17 +34,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ github.event.release.tag_name || 'v1.3.2' }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || 'v1.3.3' }}
           SOURCE_SHA: ${{ github.sha }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
           if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             test "$EVENT_NAME" != release
-            test "$RELEASE_TAG" = v1.3.2
+            test "$RELEASE_TAG" = v1.3.3
             gh release create "$RELEASE_TAG" index.html --target "$SOURCE_SHA" \
-              --title 'v1.3.2 — Faster PAAX Import and Measured CV Bounds' \
-              --notes-file docs/release-v1.3.2.md --latest
+              --title 'v1.3.3 — CV Cycle Selection for ECSA' \
+              --notes-file docs/release-v1.3.3.md --latest
           else
             gh release upload "$RELEASE_TAG" index.html --clobber
           fi

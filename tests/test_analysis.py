@@ -34,6 +34,22 @@ def kl_data():
 
 
 class AnalysisTests(unittest.TestCase):
+    def test_selected_cv_cycle_matches_browser(self):
+        cv = dict(E=[0,.2,.4,.2]*5+[0], j=[v for peak in range(1,6) for v in (0,peak,0,0)]+[0],
+                  hupd_range_V=[0,.4], cycle_number=2)
+        program = "const a=require('./web/analysis.js');console.log(JSON.stringify(a.cvAnalysis(JSON.parse(process.argv[1]),.02)))"
+        for starts in (None, list(range(0,20,2))):
+            cv["segment_starts"] = starts
+            result = cv_analysis(cv,.02)
+            self.assertEqual(result["cycle_number"], 2)
+            self.assertAlmostEqual(result["SH_mA_V_cm2"], .4)
+            browser = json.loads(subprocess.run(["node","-e",program,json.dumps(cv)],capture_output=True,text=True,cwd=ROOT,check=True).stdout)
+            self.assertEqual(browser["cycle_number"], 2)
+            self.assertAlmostEqual(browser["ecsa_m2_g"], result["ecsa_m2_g"])
+        self.assertAlmostEqual(cv_analysis({**cv,"cycle_number":None},.02)["SH_mA_V_cm2"], 1.)
+        with self.assertRaises(ValueError):
+            cv_analysis({**cv,"cycle_number":6},.02)
+
     def test_hupd_measured_bounds_browser_parity(self):
         cv = dict(E=[.052,.057,.2,.394,.398,.4,.2,.052], j=[0,.1,1,.1,.02,.01,-1,-.2],
                   hupd_range_V=[.05,.402], baseline_endpoints_mA_cm2=[0,.2])

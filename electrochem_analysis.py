@@ -167,32 +167,59 @@ def hupd_region(x, y, lo, hi, baseline):
 
 
 def cv_analysis(cv, loading):
-    """Last complete anodic Hupd sweep; compare like-direction scans."""
+    """Integrate the selected cycle's anodic sweep when a cycle is specified."""
     if not cv:
         return dict(ecsa_m2_g=None, stability_fraction=None, anodic_sweeps=0)
     requested_lo, requested_hi = cv.get("hupd_range_V", [0.05, 0.4])
     rate, q = cv.get("scan_rate_V_s", 0.02), cv.get("q_mC_cm2", 0.21)
     if not np.isfinite([rate,q,requested_lo,requested_hi]).all() or rate <= 0 or q <= 0 or requested_lo >= requested_hi:
         raise ValueError("Invalid CV integration parameters")
+    potentials, currents = np.asarray(cv["E"], float), np.asarray(cv["j"], float)
+    starts = cv.get("segment_starts")
+    if (isinstance(starts, list) and len(starts) >= 2 and starts[0] == 0 and
+            all(type(start) is int and start < len(potentials)-1 and
+                (not i or start > starts[i-1]) for i, start in enumerate(starts))):
+        if len(potentials) != len(currents) or not (np.isfinite(potentials).all() and np.isfinite(currents).all()):
+            raise ValueError("Invalid CV points")
+        segments = [(potentials[start:end+1], currents[start:end+1])
+                    for start, end in zip(starts, starts[1:]+[len(potentials)-1])]
+    else:
+        segments = sweeps(potentials, currents)
+    cycle_number = cv.get("cycle_number")
+    cycle_indices = None
+    if cycle_number is not None:
+        cycles = []
+        for i in range(0, len(segments)-1, 2):
+            a, b = segments[i][0], segments[i+1][0]
+            if (a[-1]-a[0])*(b[-1]-b[0]) < 0 and a[-1] == b[0]:
+                cycles.append((i, i+1))
+        if type(cycle_number) is not int or not 1 <= cycle_number <= len(cycles):
+            raise ValueError("Selected CV cycle unavailable")
+        cycle_indices = cycles[cycle_number-1]
+    fields = {"cycle_number":cycle_number} if cycle_indices else {}
     branches = []
-    for x, y in sweeps(cv["E"], cv["j"]):
+    for index, (x, y) in enumerate(segments):
         if x[-1] <= x[0]:
             continue
         lo, hi = max(x[0], requested_lo), min(x[-1], requested_hi)
         if lo >= hi:
             continue
-        keep = np.r_[True, np.diff(x)>0]
-        x, y = x[keep], y[keep]
         if x[0] > requested_lo or x[-1] < requested_hi:
             if cv.get("allow_endpoint_trim") is not True:
                 continue
-            if (x[0] - requested_lo > min(x[1] - x[0], 0.005) + 1e-12 or
-                    requested_hi - x[-1] > min(x[-1] - x[-2], 0.005) + 1e-12):
+            first_step = x[(x>x[0]) & (x<=x[-1])][0] - x[0]
+            last_step = x[-1] - x[(x<x[-1]) & (x>=x[0])][-1]
+            if (x[0] - requested_lo > min(first_step, 0.005) + 1e-12 or
+                    requested_hi - x[-1] > min(last_step, 0.005) + 1e-12):
                 continue
-        branches.append((x, y, lo, hi))
-    if not branches:
-        return dict(ecsa_m2_g=None, stability_fraction=None, anodic_sweeps=0)
-    x, y, lo, hi = branches[-1]
+        bounded = np.where(x<=x[-1], x, -np.inf)
+        keep = np.r_[True, bounded[1:] > np.maximum.accumulate(bounded[:-1])]
+        branches.append((x[keep], y[keep], lo, hi, index))
+    selected = (next((branch for branch in branches if branch[-1] in cycle_indices), None)
+                if cycle_indices else (branches[-1] if branches else None))
+    if selected is None:
+        return dict(ecsa_m2_g=None, stability_fraction=None, anodic_sweeps=0, **fields)
+    x, y, lo, hi, _ = selected
     if "baseline_endpoints_mA_cm2" in cv and "baseline_mA_cm2" in cv:
         raise ValueError("Specify one CV baseline, not both horizontal and sloped")
     baseline = cv.get("baseline_endpoints_mA_cm2", cv.get("baseline_mA_cm2", float(np.interp(hi,x,y))))
@@ -219,7 +246,7 @@ def cv_analysis(cv, loading):
                 stability_fraction=stability, anodic_sweeps=len(branches),
                 SH_mA_V_cm2=sh, baseline_mA_cm2=float(endpoints[1]),
                 baseline_endpoints_mA_cm2=endpoints.tolist(),
-                hupd_requested_range_V=[requested_lo, requested_hi], hupd_effective_range_V=[lo, hi])
+                hupd_requested_range_V=[requested_lo, requested_hi], hupd_effective_range_V=[lo, hi], **fields)
 
 
 def fit_line(x, y):

@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.3 — 2026-11-23
+
+- Default ECSA to the second CV cycle when two or more cycles are available. The cycle picker controls the plot, H-upd calculation and recorded result.
+- Use AfterMath segment boundaries when available and preserve the original input for switching cycles and exporting data.
+
 ## v1.3.2 — 2026-11-23
 
 - Use acquisition times to organize PAAX test runs. Use CV scan rate and LSV current to distinguish activation, ECSA, N₂ and O₂ measurements. Hide auxiliary curves and exact copies, and open the latest ECSA curve by default when present.

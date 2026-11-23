@@ -93,6 +93,27 @@ const tick=()=>new Promise(r=>setTimeout(r,20));
  el('vrate').value='0.02';el('hlo').value='0.05';
  click('cvClear');click('lsvClear');click('n2Clear');
 
+ // The plot and integration both use the second recorded pair, with all points retained.
+ const cycleE=[0,.2,.4,.2,0,.2,.4,.2,0,.2,.4,.2,0];
+ const cycleI=cycleE.map((_,i)=>({1:1e-4,5:2e-4,9:3e-4}[i]||0));
+ const bounds=[1,3,5,7,9,11].map(id=>`<list_item point_ID="${id}" segment_boundary="yes"/>`).join('');
+ const cyclesXML=`<DAB><DAB_node type="trace"><name>CV</name><data>${axis}<boundaries>${bounds}</boundaries><points><X_data>${cycleE}</X_data><Y_data>${cycleI}</Y_data></points></data></DAB_node></DAB>`;
+ Object.defineProperty(el('paaxFile'),'files',{configurable:true,value:[{name:'cycles.paax',text:async()=>cyclesXML}]});
+ await el('paaxFile').onchange();click('paaxCv');el('vrate').value='0.02';
+ el('hlo').value='0';
+ assert.equal(el('cvCycle').value,'2');assert.equal(el('cvText').value.split('\n').length,13);
+ click('cvBtn');assert(el('cvMsg').textContent.includes('Cycle 2'));
+ assert(el('cvPlotFull').textContent.includes('Cycle 2'));
+ assert.equal(el('cvPlotFull').querySelector('polyline').getAttribute('points').split(' ').length,5);
+ const secondArea=Number(el('o_SH').textContent);
+ el('cvCycle').value='3';el('cvCycle').dispatchEvent(new w.Event('change'));
+ assert(el('cvMsg').textContent.includes('Cycle 3'));
+ assert(Math.abs(Number(el('o_SH').textContent)/secondArea-1.5)<.001);
+ const pasted=el('cvText').value;
+ el('cvText').dispatchEvent(new w.Event('input'));assert.equal(el('cvText').value,pasted);
+ click('cvBtn');assert.equal(el('cvCycle').value,'2');
+ click('cvClear');el('hlo').value='0.05';
+
  click('wbDemo');await tick();assert.equal(el('wbTable').rows.length,3);
  assert.equal(el('wbCvPlot').querySelectorAll('polyline').length,2);
  assert(el('wbCvPlot').textContent.includes('Demo-A-1'));

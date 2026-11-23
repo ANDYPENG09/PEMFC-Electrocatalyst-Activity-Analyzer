@@ -239,6 +239,11 @@
     <textarea id="cvText" placeholder="0.05, -4.4e-5&#10;0.10, 2.8e-5&#10;..."></textarea>
   </div>
 
+  <div class="field" style="margin-top:10px;">
+    <label for="cvCycle">CV cycle for ECSA</label>
+    <select id="cvCycle" disabled><option value="">Automatic (cycle 2 when available)</option></select>
+  </div>
+
   <div class="btn-row">
     <button class="btn" id="cvBtn">Calculate ECSA</button>
     <button class="btn-secondary btn" id="cvPng">Download CV Plot</button>
@@ -421,7 +426,7 @@
   <pre id="klResult" style="white-space:pre-wrap" aria-live="polite"></pre><div class="plot" id="klPlot"></div>
 </section>
 <!-- WORKBENCH END -->
-<footer>v1.3.2 &middot; MIT License &middot; Author: ANDYPENG09 &middot; Pure HTML/JS &middot; Offline &middot; No Origin Required</footer>
+<footer>v1.3.3 &middot; MIT License &middot; Author: ANDYPENG09 &middot; Pure HTML/JS &middot; Offline &middot; No Origin Required</footer>
 
 </div>
 
@@ -543,6 +548,25 @@ const ECAnalysis = (() => {
     for(let i=1;i<x.length;i++){const sign=Math.sign(x[i]-x[i-1]);if(sign&&direction&&sign!==direction){if(i-start>=3)out.push([x.slice(start,i),y.slice(start,i)]);start=i-1;}if(sign)direction=sign;}
     if(x.length-start>=3)out.push([x.slice(start),y.slice(start)]);return out;
   }
+  function cvSegments(x,y,starts){
+    if(!Array.isArray(starts)||starts[0]!==0||starts.length<2||!starts.every((i,k)=>Number.isInteger(i)&&i<x.length-1&&(!k||i>starts[k-1])))return sweeps(x,y);
+    if(x.length!==y.length||!x.every(Number.isFinite)||!y.every(Number.isFinite))throw Error('Invalid CV points');
+    return starts.map((start,i)=>{
+      const end=(starts[i+1]??(x.length-1))+1;
+      return [x.slice(start,end),y.slice(start,end)];
+    });
+  }
+  const isAnodic=([x])=>x.at(-1)>x[0];
+  function pairCycles(segments){
+    const cycles=[];
+    for(let i=0;i+1<segments.length;i+=2){
+      const first=segments[i],second=segments[i+1];
+      const [a]=first,[b]=second;
+      if((a.at(-1)-a[0])*(b.at(-1)-b[0])<0&&a.at(-1)===b[0])cycles.push([first,second]);
+    }
+    return cycles;
+  }
+  function cvCycles(x,y,starts){return pairCycles(cvSegments(x,y,starts));}
   // Insert exact baseline crossings before clipping, so the shaded polygon and
   // its trapezoidal area match the positive part of the measured line segments.
   function hupdRegion(x,y,lo,hi,baseline){
@@ -570,29 +594,41 @@ const ECAnalysis = (() => {
     const empty={ecsa_m2_g:null,stability_fraction:null,anodic_sweeps:0};if(!cv)return empty;
     const [requestedLo,requestedHi]=cv.hupd_range_V||[0.05,0.4],rate=cv.scan_rate_V_s??0.02,q=cv.q_mC_cm2??0.21;
     if(![rate,q,requestedLo,requestedHi].every(Number.isFinite)||rate<=0||q<=0||requestedLo>=requestedHi)throw Error('Invalid CV integration parameters');
-    const anodic=sweeps(cv.E,cv.j).filter(([x])=>x.at(-1)>x[0]);
+    const segments=cvSegments(cv.E,cv.j,cv.segment_starts),anodic=segments.filter(isAnodic);
+    const cycleNumber=cv.cycle_number??null;
+    const cycle=cycleNumber===null?null:pairCycles(segments)[cycleNumber-1];
+    if(cycleNumber!==null&&(!Number.isInteger(cycleNumber)||!cycle))throw Error('Selected CV cycle unavailable / 所选 CV 圈次不存在');
+    if(details&&cycle)details.cycle=cycle;
     const branches=[];
     let bestOverlap=0;
-    for(const [x,y] of anodic){
+    for(const segment of anodic){
+      const [x,y]=segment;
       const min=x[0],max=x.at(-1),lo=Math.max(min,requestedLo),hi=Math.min(max,requestedHi);
-      if(details&&hi-lo>0&&hi-lo>=bestOverlap){
+      if(details&&(!cycle||cycle.includes(segment))&&hi-lo>=bestOverlap){
         bestOverlap=hi-lo;
         details.measuredRange=[min,max];
-        details.overlap=[lo,hi];
+        if(hi>lo)details.overlap=[lo,hi];
       }
       if(lo>=hi)continue;
       if(min>requestedLo||max<requestedHi){
         if(cv.allow_endpoint_trim!==true)continue;
-        const firstStep=x.find(v=>v>min)-min,lastStep=max-x.findLast(v=>v<max);
+        const firstStep=x.find(v=>v>min&&v<=max)-min,lastStep=max-x.findLast(v=>v<max&&v>=min);
         if(min-requestedLo>Math.min(firstStep,0.005)+1e-12||requestedHi-max>Math.min(lastStep,0.005)+1e-12)continue;
       }
-      const keep=x.map((v,i)=>i===0||v>x[i-1]);
-      branches.push({x:x.filter((_,i)=>keep[i]),y:y.filter((_,i)=>keep[i]),lo,hi});
+      const xs=[min],ys=[y[0]];
+      for(let i=1;i<x.length;i++){
+        if(x[i]>xs.at(-1)&&x[i]<=max){xs.push(x[i]);ys.push(y[i]);}
+      }
+      branches.push({x:xs,y:ys,lo,hi,segment});
     }
-    if(details&&!details.measuredRange&&anodic.length)details.measuredRange=[anodic.at(-1)[0][0],anodic.at(-1)[0].at(-1)];
-    if(!branches.length)return empty;
+    const selected=cycle?branches.find(branch=>cycle.includes(branch.segment)):branches.at(-1);
+    if(details&&!details.measuredRange){
+      const sweep=(cycle?cycle.find(isAnodic):anodic.at(-1))?.[0];
+      if(sweep)details.measuredRange=[sweep[0],sweep.at(-1)];
+    }
+    if(!selected)return {...empty,...(cycle?{cycle_number:cycleNumber}:{})};
     if(Object.hasOwn(cv,'baseline_endpoints_mA_cm2')&&Object.hasOwn(cv,'baseline_mA_cm2'))throw Error('Specify one CV baseline, not both horizontal and sloped');
-    const {x,y,lo,hi}=branches.at(-1);
+    const {x,y,lo,hi}=selected;
     let baseline=Object.hasOwn(cv,'baseline_endpoints_mA_cm2')?cv.baseline_endpoints_mA_cm2:Object.hasOwn(cv,'baseline_mA_cm2')?cv.baseline_mA_cm2:interp(x,y,hi,Infinity);
     if((Object.hasOwn(cv,'baseline_endpoints_mA_cm2')&&!Array.isArray(baseline))||(Object.hasOwn(cv,'baseline_mA_cm2')&&Array.isArray(baseline)))throw Error('CV baseline must match the selected mode');
     const trimmed=lo!==requestedLo||hi!==requestedHi;
@@ -601,11 +637,11 @@ const ECAnalysis = (() => {
       baseline=[lo,hi].map(e=>start+(end-start)*(e-requestedLo)/(requestedHi-requestedLo));
     }
     const region=hupdRegion(x,y,lo,hi,baseline),sh=region.area;
-    if(details)Object.assign(details,{x,y,region});
+    if(details)details.region=region;
     const endpoints=Array.isArray(baseline)?[...baseline]:[baseline,baseline];
     let stability=null;
     if(branches.length>=2){const [a,b]=branches.slice(-2),l=Math.max(a.x[0],b.x[0]),h=Math.min(a.x.at(-1),b.x.at(-1));if(l<h){const grid=Array.from({length:101},(_,i)=>l+(h-l)*i/100),ya=grid.map(v=>interp(a.x,a.y,v,Infinity)),yb=grid.map(v=>interp(b.x,b.y,v,Infinity));stability=Math.sqrt(mean(ya.map((v,i)=>(v-yb[i])**2)))/Math.max(Math.sqrt(mean(yb.map(v=>v*v))),1e-12);}}
-    return {ecsa_m2_g:loading&&sh>0?100*sh/(q*rate*loading*1000):null,stability_fraction:stability,anodic_sweeps:branches.length,SH_mA_V_cm2:sh,baseline_mA_cm2:endpoints[1],baseline_endpoints_mA_cm2:endpoints,hupd_requested_range_V:[requestedLo,requestedHi],hupd_effective_range_V:[lo,hi]};
+    return {ecsa_m2_g:loading&&sh>0?100*sh/(q*rate*loading*1000):null,stability_fraction:stability,anodic_sweeps:branches.length,SH_mA_V_cm2:sh,baseline_mA_cm2:endpoints[1],baseline_endpoints_mA_cm2:endpoints,hupd_requested_range_V:[requestedLo,requestedHi],hupd_effective_range_V:[lo,hi],...(cycle?{cycle_number:cycleNumber}:{})};
   }
   function fitLine(x,y){
     const mx=mean(x),my=mean(y),den=x.reduce((s,v)=>s+(v-mx)**2,0);if(x.length<2||den<1e-24)throw Error('Insufficient independent fit points');
@@ -671,7 +707,7 @@ const ECAnalysis = (() => {
     return rows;
   }
   function exports(analysis){return {'analysis.json':JSON.stringify(analysis,null,2),'results.csv':csv(resultFields,analysis.samples.map(s=>({sample_id:s.sample_id,...s.metrics,qc_status:s.qc.status}))),'processed_cv.csv':csv(cvFields,analysis.samples.flatMap(s=>s.processed_cv)),'processed_orr.csv':csv(orrFields,analysis.samples.flatMap(s=>s.processed_orr)),'summary.csv':csv(summaryFields,summaryRows(analysis))};}
-  return {defaults,plateau,halfWave,kinetic,curve,interp,sweeps,hupdRegion,cvAnalysis,klFit,analyzeSample,analyzeBatch,exports,resultFields,summaryFields,summaryRows};
+  return {defaults,plateau,halfWave,kinetic,curve,interp,sweeps,cvCycles,hupdRegion,cvAnalysis,klFit,analyzeSample,analyzeBatch,exports,resultFields,summaryFields,summaryRows};
 })();
 if(typeof module!=='undefined')module.exports=ECAnalysis;
 
@@ -690,7 +726,6 @@ const EXAMPLE_CV=exampleData.cv, EXAMPLE_N2=exampleData.n2, EXAMPLE_O2=exampleDa
 
 function loadExampleData() {
   $("wbName").value = exampleData.sample_id;
-  $("cvText").value = EXAMPLE_CV;
   $("n2Text").value = EXAMPLE_N2;
   $("lsvText").value = EXAMPLE_O2;
   $("cvPotUnit").value = "V";
@@ -698,6 +733,7 @@ function loadExampleData() {
   $("o2PotUnit").value = "V";
   $("o2CurUnit").value = "A";
   $("n2CurUnit").value = "A";
+  loadCvInput(EXAMPLE_CV);
 }
 
 
@@ -935,9 +971,48 @@ function svgChart(el, series, opt){
 function getSVG(el){ return el.querySelector("svg"); }
 
 /* ===== ECSA Calculation ===== */
-let lastAnodicSweep = null;
 let lastFullCycle = null;
 let coveredHupdRange = null;
+let cvSource = null;
+
+function cycleLabel(number){
+  return `Cycle ${number}`;
+}
+function resetCvCycleOptions(){
+  const select=$('cvCycle');
+  select.replaceChildren(new Option('Automatic (cycle 2 when available)',''));
+  select.disabled=true;
+}
+function updateCvCycleOptions(data,preferred){
+  const text=$('cvText').value;
+  if(cvSource?.text!==text)cvSource={text,starts:null,count:null};
+  const {E,j}=data;
+  const count=ECAnalysis.cvCycles(E,j,cvSource.starts).length;
+  if(count===cvSource.count&&preferred===undefined)return;
+  const select=$('cvCycle');
+  const previous=cvSource.count===null?undefined:select.value;
+  cvSource.count=count;
+  if(!count){resetCvCycleOptions();return;}
+  select.replaceChildren();
+  for(let n=1;n<=count;n++)select.add(new Option(cycleLabel(n),String(n)));
+  select.add(new Option('Last eligible anodic sweep',''));
+  const requested=preferred===null?'':String(preferred??previous??Math.min(count,2));
+  select.value=[...select.options].some(option=>option.value===requested)?requested:String(Math.min(count,2));
+  select.disabled=false;
+}
+function loadCvInput(text,starts=null,preferred){
+  $('cvText').value=text;
+  $('cvText').dispatchEvent(new Event('input',{bubbles:true}));
+  cvSource={text,starts,count:null};
+  if(!text.trim())return;
+  preparePastedCvCycle(preferred);
+}
+function preparePastedCvCycle(preferred){
+  try{
+    const rows=parse2col($('cvText').value,$('cvPotUnit').value,$('cvCurUnit').value);
+    updateCvCycleOptions({E:rows.map(row=>row[0]),j:rows.map(row=>row[1])},preferred);
+  }catch{resetCvCycleOptions();}
+}
 
 let ecsaResult=null;
 function updateBaselineFields(){
@@ -957,8 +1032,11 @@ function applyBaselineInputs(cv){
   return cv;
 }
 function cvIntegrationInputs(data){
+  updateCvCycleOptions(data);
   return applyBaselineInputs({...data,scan_rate_V_s:scanRateV(),q_mC_cm2:qspecCmC(),
-    hupd_range_V:[num('hlo'),num('hhi')],allow_endpoint_trim:$('cvTrimBounds').checked});
+    hupd_range_V:[num('hlo'),num('hhi')],allow_endpoint_trim:$('cvTrimBounds').checked,
+    cycle_number:$('cvCycle').value?Number($('cvCycle').value):null,
+    ...(cvSource.starts?{segment_starts:cvSource.starts}:{})});
 }
 function cvCoverageMessage(details,lo,hi){
   const message='No anodic sweep covers the integration range / 没有完整覆盖积分范围的阳极扫描';
@@ -979,20 +1057,26 @@ function calcECSA(){
     const X=rows.map(r=>r[0]),Y=rows.map(r=>r[1]*1000/A);
     const details={};
     const result=ECAnalysis.cvAnalysis(cvIntegrationInputs({E:X,j:Y}),m/1000,details);
-    lastFullCycle={X,Y};
+    const cycle=result.cycle_number;
+    const cycleTitle=cycle?`CV · ${cycleLabel(cycle)}`:'CV';
+    if(details.cycle){
+      const [[aX,aY],[bX,bY]]=details.cycle;
+      lastFullCycle={X:aX.concat(bX.slice(1)),Y:aY.concat(bY.slice(1)),title:cycleTitle};
+    }else lastFullCycle={X,Y,title:cycleTitle};
+    const prefix=cycle?`${cycleLabel(cycle)} · `:'';
     if(!Number.isFinite(result.SH_mA_V_cm2)){
       drawCvPlots(lo,hi);
-      throw Error(cvCoverageMessage(details,lo,hi));
+      throw Error(prefix+cvCoverageMessage(details,lo,hi));
     }
     const [usedLo,usedHi]=result.hupd_effective_range_V;
     const baseline=result.baseline_endpoints_mA_cm2;
-    lastAnodicSweep=[details.x,details.y];ecsaResult=result;
+    ecsaResult=result;
     const SH=result.SH_mA_V_cm2,QH=SH/v,area=QH*A/q;
     $('o_SH').textContent=fmt(SH,5);$('o_QH').textContent=fmt(QH,4);
     $('o_ecsa').textContent=fmt(result.ecsa_m2_g,2);$('o_ecsa_cm2').textContent=fmt(area,3);$('o_rf').textContent=fmt(area/A,2);
     const requested=usedLo!==lo||usedHi!==hi?` Requested / 设定: ${lo}–${hi} V.`:'';
     const zero=SH===0?' No positive area above the baseline / 基线以上无正积分面积。':'';
-    $('cvMsg').textContent=`Hupd used / 实际积分: ${usedLo}–${usedHi} V.${requested} S_H = ${SH.toFixed(5)} mA·V/cm². Baseline / 基线 = ${baseline[0].toFixed(5)}, ${baseline[1].toFixed(5)} mA/cm².${zero}`;
+    $('cvMsg').textContent=`${prefix}Hupd used / 实际积分: ${usedLo}–${usedHi} V.${requested} S_H = ${SH.toFixed(5)} mA·V/cm². Baseline / 基线 = ${baseline[0].toFixed(5)}, ${baseline[1].toFixed(5)} mA/cm².${zero}`;
     drawCvPlots(usedLo,usedHi,details.region);
   }catch(e){$('cvMsg').textContent=e.message;}
   finally{calcORR();}
@@ -1005,7 +1089,7 @@ function drawCvPlots(lo, hi, region){
     $("cvPlotZoom").innerHTML = "";
     return;
   }
-  const {X,Y}=lastFullCycle;
+  const {X,Y,title}=lastFullCycle;
   let x=X,y=Y;
   if(X.length>4000){
     const step=Math.ceil(X.length/1000);
@@ -1025,7 +1109,7 @@ function drawCvPlots(lo, hi, region){
     x=indices.map(i=>X[i]);y=indices.map(i=>Y[i]);
   }
   svgChart($("cvPlotFull"), [{x,y,color:"#1d1d1f"}], {
-    title: "CV", xlabel: "E (V vs RHE)", ylabel: "J (mA/cm\u00B2)",
+    title, xlabel: "E (V vs RHE)", ylabel: "J (mA/cm\u00B2)",
     regions: region?[{ x0: lo, x1: hi, color: "#0071e3" }]:[]
   });
   if(!region)return;
@@ -1144,7 +1228,8 @@ $("lsvBtn").addEventListener("click", () => {
 /* ===== Clear ===== */
 $("cvClear").addEventListener("click", () => {
   invalidateCv();
-  $("cvText").value = ""; $("baseline").value = ""; $("baselineStart").value = ""; $("baselineEnd").value = "";
+  $("cvText").value = ""; cvSource=null;resetCvCycleOptions();
+  $("baseline").value = ""; $("baselineStart").value = ""; $("baselineEnd").value = "";
   ["o_SH","o_QH","o_ecsa","o_ecsa_cm2","o_rf"].forEach(id => $(id).textContent = "\u2014");
   $("cvMsg").textContent = "Cleared.";
   $("cvPlotFull").innerHTML = ""; $("cvPlotZoom").innerHTML = "";
@@ -1263,6 +1348,7 @@ $("exportCsv").addEventListener("click", () => {
   push("Hupd upper limit (V)", $("hhi").value);
   push("Baseline mode", $("baselineMode").value);
   if(ecsaResult){
+    if(ecsaResult.cycle_number)push("CV cycle number",ecsaResult.cycle_number);
     push("Hupd effective lower limit (V)", ecsaResult.hupd_effective_range_V[0]);
     push("Hupd effective upper limit (V)", ecsaResult.hupd_effective_range_V[1]);
     push("Baseline at lower limit (mA/cm²)", ecsaResult.baseline_endpoints_mA_cm2[0]);
@@ -1299,6 +1385,7 @@ document.querySelectorAll(".frac-tag").forEach(b =>
   }));
 
 $("cvBtn").addEventListener("click", calcECSA);
+$('cvCycle').addEventListener('change',calcECSA);
 $('cvUseCoveredRange').addEventListener('click',()=>{
   if(!coveredHupdRange)return;
   if($('baselineMode').value==='linear'){
@@ -1308,21 +1395,21 @@ $('cvUseCoveredRange').addEventListener('click',()=>{
   [$('hlo').value,$('hhi').value]=coveredHupdRange;
   calcECSA();
 });
-$("cvText").addEventListener("input", () => { });
 $("loadExample").addEventListener("click", loadExampleData);
 
 function invalidateCv(){
   ecsaResult=null;
   coveredHupdRange=null;$('cvUseCoveredRange').hidden=true;
   $('cvMsg').textContent='';
-  lastFullCycle=null;lastAnodicSweep=null;lastCvZoom=null;$('cvPlotFull').replaceChildren();$('cvPlotZoom').replaceChildren();
+  lastFullCycle=null;lastCvZoom=null;$('cvPlotFull').replaceChildren();$('cvPlotZoom').replaceChildren();
   ['o_SH','o_QH','o_ecsa','o_ecsa_cm2','o_rf'].forEach(id=>$(id).textContent='—');calcORR();
 }
 function invalidateLsv(){
   lsvResult=null;lastLsvX=null;lastLsvY=null;$('lsvPlot').replaceChildren();$('lsvPlot').style.display='none';
   $('jE').value='';$('jlim').value='';calcORR();
 }
-$('cvText').addEventListener('input',invalidateCv);
+$('cvText').addEventListener('input',()=>{cvSource=null;resetCvCycleOptions();invalidateCv();});
+$('cvText').addEventListener('change',()=>preparePastedCvCycle());
 ['lsvText','n2Text','o2PotUnit','o2CurUnit','n2CurUnit','area'].forEach(id=>$(id).addEventListener('input',invalidateLsv));
 ['Ep','jlimE','jlimMode'].forEach(id=>$(id).addEventListener('input',()=>{if(lsvResult)$('lsvBtn').click();}));
 
@@ -1355,6 +1442,7 @@ document.querySelector('.frac-tag[data-f="30"]').classList.add("active");
     $('cvClear').click();$('lsvClear').click();$('n2Clear').click();
     for(const id of inputIds)if(Object.hasOwn(sample.input_state,id))$(id).value=sample.input_state[id];
     $('cvTrimBounds').checked=sample.input_state.cvTrimBounds===true;
+    loadCvInput($('cvText').value,sample.cv?.segment_starts??null,sample.cv?.cycle_number??null);
     $('wbName').value=sample.sample_id;updateBaselineFields();computePtLoad();
     if($('cvText').value.trim())calcECSA();if($('lsvText').value.trim())$('lsvBtn').click();
     $('wbMessage').textContent=T('Inputs restored. Change the name to save a new snapshot.','已恢复输入；如需另存快照，请修改样品名称。');
@@ -1421,7 +1509,8 @@ document.querySelector('.frac-tag[data-f="30"]').classList.add("active");
       const detail=text('details','',$('wbQC'));text('summary',`${s.sample_id} — ${s.qc.status}`,detail);
       if(s.cv?.hupd_effective_range_V){
         const used=s.cv.hupd_effective_range_V.join('–'),requested=s.cv.hupd_requested_range_V.join('–');
-        text('p',T(`Hupd used: ${used} V. Requested: ${requested} V.`,`Hupd 实际积分 ${used} V，设定 ${requested} V。`),detail);
+        const cycle=s.cv.cycle_number?`${cycleLabel(s.cv.cycle_number)} · `:'';
+        text('p',cycle+T(`Hupd used: ${used} V. Requested: ${requested} V.`,`Hupd 实际积分 ${used} V，设定 ${requested} V。`),detail);
       }
       if(s.plateau)text('p',`Plateau: ${display(s.plateau.start_V)}–${display(s.plateau.end_V)} V; median ${display(s.plateau.jlim_mA_cm2)}; MAD ${display(s.plateau.mad_mA_cm2)}; SD ${display(s.plateau.std_mA_cm2)} mA/cm²`,detail);
       if(s.metadata?.o2_points_outside_n2)text('p',`${s.metadata.o2_points_outside_n2} O2 endpoint(s) outside N2 coverage omitted · 已省略 N₂ 范围外的 O₂ 端点。`,detail);
@@ -1520,6 +1609,8 @@ document.querySelector('.frac-tag[data-f="30"]').classList.add("active");
   const exact = new Map([
     ['Import Pine AfterMath PAAX','导入 Pine AfterMath PAAX'],['PAAX file','PAAX 文件'],['Select PAAX trace','选择 PAAX 曲线'],['Load into CV','导入 CV'],['Load into O₂ LSV','导入 O₂ LSV'],['Load into N₂ Background','导入 N₂ 背景'],
     ['Use measured integration limits','使用实测积分界限'],
+    ['CV cycle for ECSA','ECSA 积分圈次'],['Automatic (cycle 2 when available)','自动（有第 2 圈时优先选用）'],
+    ['Last eligible anodic sweep','最后一条可积分阳极扫描'],
     ['Test run','测试轮次'],['All test runs','全部轮次'],['Curve group','曲线分组'],['All curves','全部曲线'],
     ['Activation CV','活化 CV'],['Other CV','其他 CV'],['LSV gas unconfirmed','LSV 气氛待确认'],['Technique unconfirmed','类型待确认'],
     ['Select a test run and trace. Check the scan rate, potential reference and Pt loading before calculation.','选择测试轮次并导入曲线。计算前核对扫速、电位参比与 Pt 载量。'],
@@ -1594,7 +1685,7 @@ document.querySelector('.frac-tag[data-f="30"]').classList.add("active");
     if(exact.has(s)) return exact.get(s);
     let out=s;
     for(const [en,zh] of phrases) out=out.split(en).join(zh);
-    out=out.replace(/^Download (.+)$/,'下载 $1')
+    out=out.replace(/^Download (.+)$/,'下载 $1').replace(/\bCycle (\d+)\b/g,'第 $1 圈')
       .replace(/^(\d+) sample\(s\) analyzed\. Results are snapshots\.$/,'已分析 $1 个样品；结果为当前快照。')
       .replace(/^Plateau:/,'平台：').replace(/; median /g,'；中位数 ').replace(/; MAD /g,'；MAD ').replace(/; SD /g,'；SD ')
       .replace(/^Difference:/,'差异：').replace(/^Ratio:/,'比例：').replace(/ points\.$/,' 个点。');
@@ -1825,7 +1916,11 @@ document.querySelector('.frac-tag[data-f="30"]').classList.add("active");
       while(used.has(name))name=`${base} (${n++})`;
       used.add(name);
       const date=child(byIndex.get(experiment),'start_time')?.textContent||child(study,'created')?.textContent||'';
-      const trace={name,label,date,xkind,ykind,xunit,yunit,scanRateV_s:scanRate(data),blocks,error};
+      const boundaries=child(data,'boundaries');
+      const segmentStarts=Array.from(boundaries?.children??[])
+        .filter(point=>point.getAttribute('segment_boundary')==='yes')
+        .map(point=>Number(point.getAttribute('point_ID'))-1);
+      const trace={name,label,date,xkind,ykind,xunit,yunit,scanRateV_s:scanRate(data),blocks,segmentStarts,error};
       const names=parents.map(nodeName).filter(Boolean).join(' / ').replaceAll('₂','2');
       const hint=names.match(/\b(CV|LSV|cyclic voltammogram|linear sweep voltammogram)\b/i)?.[0].toUpperCase();
       const type=known||(hint&&(hint==='CV'||hint.startsWith('CYCLIC')?'CV':'LSV'))||(!error&&sweepType(trace))||'';
@@ -1977,7 +2072,11 @@ document.querySelector('.frac-tag[data-f="30"]').classList.add("active");
       }
       byId('o2PotUnit').value='V';byId(target==='o2'?'o2CurUnit':'n2CurUnit').value='A';
     }
-    byId(input).value=data;byId(input).dispatchEvent(new Event('input',{bubbles:true}));
+    if(target==='cv')loadCvInput(data,trace.segmentStarts.length?trace.segmentStarts:null);
+    else{
+      byId(input).value=data;
+      byId(input).dispatchEvent(new Event('input',{bubbles:true}));
+    }
     byId('paaxMessage').textContent=T('Loaded ','已导入 ')+trace.label+` → ${targets.find(([,id])=>id===target)[2]} (${X.length}; V, A).`+rateMessage;
   }
   for(const [button,target] of targets){
