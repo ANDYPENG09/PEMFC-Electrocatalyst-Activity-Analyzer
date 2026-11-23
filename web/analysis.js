@@ -55,7 +55,7 @@ const ECAnalysis = (() => {
   }
   function kinetic(j,jl){return j===null||jl===null||j>=0||jl>=0||Math.abs(j)>=Math.abs(jl)?null:Math.abs(j)*Math.abs(jl)/(Math.abs(jl)-Math.abs(j));}
   function sweeps(x,y){
-    if(x.length!==y.length||x.length<2||![...x,...y].every(Number.isFinite))throw Error('Invalid CV points');
+    if(x.length!==y.length||x.length<2||!x.every(Number.isFinite)||!y.every(Number.isFinite))throw Error('Invalid CV points');
     const out=[];let start=0,direction=0;
     for(let i=1;i<x.length;i++){const sign=Math.sign(x[i]-x[i-1]);if(sign&&direction&&sign!==direction){if(i-start>=3)out.push([x.slice(start,i),y.slice(start,i)]);start=i-1;}if(sign)direction=sign;}
     if(x.length-start>=3)out.push([x.slice(start),y.slice(start)]);return out;
@@ -83,20 +83,46 @@ const ECAnalysis = (() => {
     for(let i=1;i<px.length;i++)area+=(px[i]-px[i-1])*(upper[i]-background[i]+upper[i-1]-background[i-1])/2;
     return {x:px,current,upper,baseline:background,area};
   }
-  function cvAnalysis(cv,loading){
+  function cvAnalysis(cv,loading,details){
     const empty={ecsa_m2_g:null,stability_fraction:null,anodic_sweeps:0};if(!cv)return empty;
-    const [lo,hi]=cv.hupd_range_V||[0.05,0.4],rate=cv.scan_rate_V_s??0.02,q=cv.q_mC_cm2??0.21;
-    if(![rate,q,lo,hi].every(Number.isFinite)||rate<=0||q<=0||lo>=hi)throw Error('Invalid CV integration parameters');
-    const branches=sweeps(cv.E,cv.j).filter(([x])=>x.at(-1)>x[0]&&x[0]<=lo&&x.at(-1)>=hi).map(([x,y])=>{const keep=x.map((v,i)=>i===0||v>x[i-1]);return [x.filter((v,i)=>keep[i]),y.filter((v,i)=>keep[i])];});
+    const [requestedLo,requestedHi]=cv.hupd_range_V||[0.05,0.4],rate=cv.scan_rate_V_s??0.02,q=cv.q_mC_cm2??0.21;
+    if(![rate,q,requestedLo,requestedHi].every(Number.isFinite)||rate<=0||q<=0||requestedLo>=requestedHi)throw Error('Invalid CV integration parameters');
+    const anodic=sweeps(cv.E,cv.j).filter(([x])=>x.at(-1)>x[0]);
+    const branches=[];
+    let bestOverlap=0;
+    for(const [x,y] of anodic){
+      const min=x[0],max=x.at(-1),lo=Math.max(min,requestedLo),hi=Math.min(max,requestedHi);
+      if(details&&hi-lo>0&&hi-lo>=bestOverlap){
+        bestOverlap=hi-lo;
+        details.measuredRange=[min,max];
+        details.overlap=[lo,hi];
+      }
+      if(lo>=hi)continue;
+      if(min>requestedLo||max<requestedHi){
+        if(cv.allow_endpoint_trim!==true)continue;
+        const firstStep=x.find(v=>v>min)-min,lastStep=max-x.findLast(v=>v<max);
+        if(min-requestedLo>Math.min(firstStep,0.005)+1e-12||requestedHi-max>Math.min(lastStep,0.005)+1e-12)continue;
+      }
+      const keep=x.map((v,i)=>i===0||v>x[i-1]);
+      branches.push({x:x.filter((_,i)=>keep[i]),y:y.filter((_,i)=>keep[i]),lo,hi});
+    }
+    if(details&&!details.measuredRange&&anodic.length)details.measuredRange=[anodic.at(-1)[0][0],anodic.at(-1)[0].at(-1)];
     if(!branches.length)return empty;
     if(Object.hasOwn(cv,'baseline_endpoints_mA_cm2')&&Object.hasOwn(cv,'baseline_mA_cm2'))throw Error('Specify one CV baseline, not both horizontal and sloped');
-    const [x,y]=branches.at(-1),baseline=Object.hasOwn(cv,'baseline_endpoints_mA_cm2')?cv.baseline_endpoints_mA_cm2:Object.hasOwn(cv,'baseline_mA_cm2')?cv.baseline_mA_cm2:interp(x,y,hi,Infinity);
+    const {x,y,lo,hi}=branches.at(-1);
+    let baseline=Object.hasOwn(cv,'baseline_endpoints_mA_cm2')?cv.baseline_endpoints_mA_cm2:Object.hasOwn(cv,'baseline_mA_cm2')?cv.baseline_mA_cm2:interp(x,y,hi,Infinity);
     if((Object.hasOwn(cv,'baseline_endpoints_mA_cm2')&&!Array.isArray(baseline))||(Object.hasOwn(cv,'baseline_mA_cm2')&&Array.isArray(baseline)))throw Error('CV baseline must match the selected mode');
-    const sh=hupdRegion(x,y,lo,hi,baseline).area;
+    const trimmed=lo!==requestedLo||hi!==requestedHi;
+    if(trimmed&&Array.isArray(baseline)&&baseline.length===2){
+      const [start,end]=baseline;
+      baseline=[lo,hi].map(e=>start+(end-start)*(e-requestedLo)/(requestedHi-requestedLo));
+    }
+    const region=hupdRegion(x,y,lo,hi,baseline),sh=region.area;
+    if(details)Object.assign(details,{x,y,region});
     const endpoints=Array.isArray(baseline)?[...baseline]:[baseline,baseline];
     let stability=null;
-    if(branches.length>=2){const [a,b]=branches.slice(-2),l=Math.max(a[0][0],b[0][0]),h=Math.min(a[0].at(-1),b[0].at(-1)),grid=Array.from({length:101},(_,i)=>l+(h-l)*i/100),ya=grid.map(v=>interp(...a,v,Infinity)),yb=grid.map(v=>interp(...b,v,Infinity));stability=Math.sqrt(mean(ya.map((v,i)=>(v-yb[i])**2)))/Math.max(Math.sqrt(mean(yb.map(v=>v*v))),1e-12);}
-    return {ecsa_m2_g:loading&&sh>0?100*sh/(q*rate*loading*1000):null,stability_fraction:stability,anodic_sweeps:branches.length,SH_mA_V_cm2:sh,baseline_mA_cm2:endpoints[1],baseline_endpoints_mA_cm2:endpoints};
+    if(branches.length>=2){const [a,b]=branches.slice(-2),l=Math.max(a.x[0],b.x[0]),h=Math.min(a.x.at(-1),b.x.at(-1));if(l<h){const grid=Array.from({length:101},(_,i)=>l+(h-l)*i/100),ya=grid.map(v=>interp(a.x,a.y,v,Infinity)),yb=grid.map(v=>interp(b.x,b.y,v,Infinity));stability=Math.sqrt(mean(ya.map((v,i)=>(v-yb[i])**2)))/Math.max(Math.sqrt(mean(yb.map(v=>v*v))),1e-12);}}
+    return {ecsa_m2_g:loading&&sh>0?100*sh/(q*rate*loading*1000):null,stability_fraction:stability,anodic_sweeps:branches.length,SH_mA_V_cm2:sh,baseline_mA_cm2:endpoints[1],baseline_endpoints_mA_cm2:endpoints,hupd_requested_range_V:[requestedLo,requestedHi],hupd_effective_range_V:[lo,hi]};
   }
   function fitLine(x,y){
     const mx=mean(x),my=mean(y),den=x.reduce((s,v)=>s+(v-mx)**2,0);if(x.length<2||den<1e-24)throw Error('Insufficient independent fit points');

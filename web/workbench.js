@@ -21,6 +21,7 @@
     if(!sample.input_state){$('wbMessage').textContent=T('This imported sample has no original input form; its curves remain available for comparison.','此导入样品没有原始输入表单；仍可参与曲线比较。');return;}
     $('cvClear').click();$('lsvClear').click();$('n2Clear').click();
     for(const id of inputIds)if(Object.hasOwn(sample.input_state,id))$(id).value=sample.input_state[id];
+    $('cvTrimBounds').checked=sample.input_state.cvTrimBounds===true;
     $('wbName').value=sample.sample_id;updateBaselineFields();computePtLoad();
     if($('cvText').value.trim())calcECSA();if($('lsvText').value.trim())$('lsvBtn').click();
     $('wbMessage').textContent=T('Inputs restored. Change the name to save a new snapshot.','已恢复输入；如需另存快照，请修改样品名称。');
@@ -62,8 +63,8 @@
 
     }
     if($('cvText').value.trim()){
-      s.cv=applyBaselineInputs({...read('cvText','cvPotUnit','cvCurUnit'),scan_rate_V_s:scanRateV(),q_mC_cm2:qspecCmC(),hupd_range_V:[num('hlo'),num('hhi')]});
-    }s.input_state=Object.fromEntries(inputIds.map(id=>[id,$(id).value]));s.saved_at=new Date().toISOString();return s;
+      s.cv=cvIntegrationInputs(read('cvText','cvPotUnit','cvCurUnit'));
+    }s.input_state=Object.fromEntries(inputIds.map(id=>[id,$(id).value]));s.input_state.cvTrimBounds=$('cvTrimBounds').checked;s.saved_at=new Date().toISOString();return s;
   }
   function render(){
     $('wbTable').replaceChildren();$('wbQC').replaceChildren();$('wbLegend').replaceChildren();$('wbDownloads').replaceChildren();
@@ -85,6 +86,10 @@
       const remove=text('button','Remove',actions);remove.className='btn btn-secondary';remove.onclick=guarded(()=>commit(samples.filter(t=>t.sample_id!==s.sample_id)));
       if(!selected.has(s.sample_id))return;
       const detail=text('details','',$('wbQC'));text('summary',`${s.sample_id} — ${s.qc.status}`,detail);
+      if(s.cv?.hupd_effective_range_V){
+        const used=s.cv.hupd_effective_range_V.join('–'),requested=s.cv.hupd_requested_range_V.join('–');
+        text('p',T(`Hupd used: ${used} V. Requested: ${requested} V.`,`Hupd 实际积分 ${used} V，设定 ${requested} V。`),detail);
+      }
       if(s.plateau)text('p',`Plateau: ${display(s.plateau.start_V)}–${display(s.plateau.end_V)} V; median ${display(s.plateau.jlim_mA_cm2)}; MAD ${display(s.plateau.mad_mA_cm2)}; SD ${display(s.plateau.std_mA_cm2)} mA/cm²`,detail);
       if(s.metadata?.o2_points_outside_n2)text('p',`${s.metadata.o2_points_outside_n2} O2 endpoint(s) outside N2 coverage omitted · 已省略 N₂ 范围外的 O₂ 端点。`,detail);
       const list=text('ul','',detail);s.qc.checks.forEach(c=>text('li',`${c.status}: ${c.reason}${checkDetail(c)}`,list));

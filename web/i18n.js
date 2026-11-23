@@ -3,6 +3,10 @@
   const exact = new Map([
     ['Import Pine AfterMath PAAX','导入 Pine AfterMath PAAX'],['PAAX file','PAAX 文件'],['Select PAAX trace','选择 PAAX 曲线'],['Load into CV','导入 CV'],['Load into O₂ LSV','导入 O₂ LSV'],['Load into N₂ Background','导入 N₂ 背景'],
     ['Use measured integration limits','使用实测积分界限'],
+    ['Test run','测试轮次'],['All test runs','全部轮次'],['Curve group','曲线分组'],['All curves','全部曲线'],
+    ['Activation CV','活化 CV'],['Other CV','其他 CV'],['LSV gas unconfirmed','LSV 气氛待确认'],['Technique unconfirmed','类型待确认'],
+    ['Select a test run and trace. Check the scan rate, potential reference and Pt loading before calculation.','选择测试轮次并导入曲线。计算前核对扫速、电位参比与 Pt 载量。'],
+    ['Allow small adjustments to measured limits (at most one step and 5 mV)','允许积分边界贴合实测值（每端最多一个采样步长，且不超过 5 mV）'],
     ['Read PAAX files directly, select a potential/current trace, then load it into CV, O₂ LSV or N₂ background. Imported values use V and A. Confirm scan rate, reference and loading before calculation.','直接读取 PAAX，选择电位/电流曲线后导入 CV、O₂ LSV 或 N₂ 背景；导入值使用 V 和 A。计算前请确认扫描速率、参比和载量。'],
     ['Method note','方法说明'],
     ['Electrochemical Surface Area (ECSA · Hupd Method)','电化学活性表面积（ECSA · Hupd 法）'],

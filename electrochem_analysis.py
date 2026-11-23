@@ -170,37 +170,56 @@ def cv_analysis(cv, loading):
     """Last complete anodic Hupd sweep; compare like-direction scans."""
     if not cv:
         return dict(ecsa_m2_g=None, stability_fraction=None, anodic_sweeps=0)
-    lo, hi = cv.get("hupd_range_V", [0.05, 0.4])
+    requested_lo, requested_hi = cv.get("hupd_range_V", [0.05, 0.4])
     rate, q = cv.get("scan_rate_V_s", 0.02), cv.get("q_mC_cm2", 0.21)
-    if not np.isfinite([rate,q,lo,hi]).all() or rate <= 0 or q <= 0 or lo >= hi:
+    if not np.isfinite([rate,q,requested_lo,requested_hi]).all() or rate <= 0 or q <= 0 or requested_lo >= requested_hi:
         raise ValueError("Invalid CV integration parameters")
-    branches = [(x,y) for x,y in sweeps(cv["E"], cv["j"]) if x[-1] > x[0] and x[0] <= lo and x[-1] >= hi]
+    branches = []
+    for x, y in sweeps(cv["E"], cv["j"]):
+        if x[-1] <= x[0]:
+            continue
+        lo, hi = max(x[0], requested_lo), min(x[-1], requested_hi)
+        if lo >= hi:
+            continue
+        keep = np.r_[True, np.diff(x)>0]
+        x, y = x[keep], y[keep]
+        if x[0] > requested_lo or x[-1] < requested_hi:
+            if cv.get("allow_endpoint_trim") is not True:
+                continue
+            if (x[0] - requested_lo > min(x[1] - x[0], 0.005) + 1e-12 or
+                    requested_hi - x[-1] > min(x[-1] - x[-2], 0.005) + 1e-12):
+                continue
+        branches.append((x, y, lo, hi))
     if not branches:
         return dict(ecsa_m2_g=None, stability_fraction=None, anodic_sweeps=0)
-    # Remove potential holds within a CV branch; never average opposite branches.
-    branches = [(x[np.r_[True, np.diff(x)>0]], y[np.r_[True, np.diff(x)>0]]) for x,y in branches]
-    x,y = branches[-1]
+    x, y, lo, hi = branches[-1]
     if "baseline_endpoints_mA_cm2" in cv and "baseline_mA_cm2" in cv:
         raise ValueError("Specify one CV baseline, not both horizontal and sloped")
     baseline = cv.get("baseline_endpoints_mA_cm2", cv.get("baseline_mA_cm2", float(np.interp(hi,x,y))))
     if ("baseline_endpoints_mA_cm2" in cv and np.asarray(baseline).shape != (2,)) or (
             "baseline_mA_cm2" in cv and np.asarray(baseline).ndim != 0):
         raise ValueError("CV baseline must match the selected mode")
+    if np.asarray(baseline).shape == (2,) and (lo, hi) != (requested_lo, requested_hi):
+        start, end = baseline
+        baseline = [start + (end-start)*(e-requested_lo)/(requested_hi-requested_lo) for e in (lo, hi)]
     _, _, _, sh = hupd_region(x, y, lo, hi, baseline)
     endpoints = np.asarray(baseline, dtype=float)
     if endpoints.ndim == 0:
         endpoints = np.repeat(endpoints, 2)
     stability = None
     if len(branches) >= 2:
-        a,b = branches[-2:]
-        grid = np.linspace(max(a[0][0],b[0][0]), min(a[0][-1],b[0][-1]), 101)
-        ya,yb = np.interp(grid,*a),np.interp(grid,*b)
-        scale = max(float(np.sqrt(np.mean(yb**2))), 1e-12)
-        stability = float(np.sqrt(np.mean((ya-yb)**2))/scale)
+        a, b = (branch[:2] for branch in branches[-2:])
+        start, end = max(a[0][0], b[0][0]), min(a[0][-1], b[0][-1])
+        if start < end:
+            grid = np.linspace(start, end, 101)
+            ya,yb = np.interp(grid,*a),np.interp(grid,*b)
+            scale = max(float(np.sqrt(np.mean(yb**2))), 1e-12)
+            stability = float(np.sqrt(np.mean((ya-yb)**2))/scale)
     return dict(ecsa_m2_g=100*sh/(q*rate*loading*1000) if loading and sh > 0 else None,
                 stability_fraction=stability, anodic_sweeps=len(branches),
                 SH_mA_V_cm2=sh, baseline_mA_cm2=float(endpoints[1]),
-                baseline_endpoints_mA_cm2=endpoints.tolist())
+                baseline_endpoints_mA_cm2=endpoints.tolist(),
+                hupd_requested_range_V=[requested_lo, requested_hi], hupd_effective_range_V=[lo, hi])
 
 
 def fit_line(x, y):

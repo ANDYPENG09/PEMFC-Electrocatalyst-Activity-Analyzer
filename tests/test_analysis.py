@@ -34,6 +34,23 @@ def kl_data():
 
 
 class AnalysisTests(unittest.TestCase):
+    def test_hupd_measured_bounds_browser_parity(self):
+        cv = dict(E=[.052,.057,.2,.394,.398,.4,.2,.052], j=[0,.1,1,.1,.02,.01,-1,-.2],
+                  hupd_range_V=[.05,.402], baseline_endpoints_mA_cm2=[0,.2])
+        self.assertIsNone(cv_analysis(cv,.02)["ecsa_m2_g"])
+        cv["allow_endpoint_trim"] = True
+        result = cv_analysis(cv,.02)
+        self.assertEqual(result["hupd_requested_range_V"], [.05,.402])
+        self.assertEqual(result["hupd_effective_range_V"], [.052,.4])
+        self.assertAlmostEqual(result["baseline_endpoints_mA_cm2"][0], .2*.002/.352)
+        reference = {**cv, "hupd_range_V":[.052,.4], "baseline_endpoints_mA_cm2":result["baseline_endpoints_mA_cm2"]}
+        self.assertAlmostEqual(result["SH_mA_V_cm2"], cv_analysis(reference,.02)["SH_mA_V_cm2"])
+        self.assertIsNone(cv_analysis({**cv, "hupd_range_V":[.04,.402]},.02)["ecsa_m2_g"])
+        program = "const a=require('./web/analysis.js');console.log(JSON.stringify(a.cvAnalysis(JSON.parse(process.argv[1]),.02)))"
+        browser = json.loads(subprocess.run(["node","-e",program,json.dumps(cv)],capture_output=True,text=True,cwd=ROOT,check=True).stdout)
+        self.assertEqual(browser["hupd_effective_range_V"], result["hupd_effective_range_V"])
+        self.assertAlmostEqual(browser["ecsa_m2_g"], result["ecsa_m2_g"])
+
     def test_example_orr_figure_matches_calculator(self):
         from generate_doc_figures import example_curves
         cv, eo, corrected = example_curves()

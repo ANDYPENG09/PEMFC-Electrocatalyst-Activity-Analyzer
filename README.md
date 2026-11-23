@@ -4,7 +4,7 @@ Offline **CV / ORR analysis** for catalyst R&D: ECSA, mass activity, specific ac
 
 **[Open the workbench](https://andypeng09.github.io/PEMFC-Electrocatalyst-Activity-Analyzer/)** · **[Download the latest release HTML](https://github.com/ANDYPENG09/PEMFC-Electrocatalyst-Activity-Analyzer/releases/latest/download/index.html)** · [Releases](https://github.com/ANDYPENG09/PEMFC-Electrocatalyst-Activity-Analyzer/releases) · [Methods and export schema](docs/methods-and-exports.md)
 
-**v1.3.1** includes the Pine AfterMath PAAX import fix and measured CV integration limits. Open the self-contained `index.html` in a browser to work offline in English or 中文.
+**v1.3.2** groups Pine AfterMath curves, loads numerical data on demand, and reports the measured CV integration limits. Open the self-contained `index.html` in a browser to work offline in English or 中文.
 
 ### How H-upd ECSA is calculated
 
@@ -75,6 +75,6 @@ Join `results.csv` to an experimental-design table by `sample_id`, retaining QC 
 
 ### Direct PAAX import
 
-Open **Import Pine AfterMath PAAX**, choose a `.paax` file, select a potential/current trace, then choose **Load into CV**, **Load into O₂ LSV**, or **Load into N₂ Background**. The offline HTML reads units and points from the trace or its `<data>` block, preserves point order, and converts supported explicit units to V/A. AfterMath data with `qty_kind=potential/current` and no explicit unit symbol use V/A. The selector shows the originating study when available. Loading a CV with supported AfterMath scan-rate metadata fills the scan rate. Confirm the potential reference and catalyst loading before calculation.
+Open **Import Pine AfterMath PAAX**, choose a `.paax` file, and select the test run and curve. The picker hides auxiliary time traces and exact copies from the same experiment. With recorded times, it groups the traces in the order activation CV → ECSA CV → N₂ LSV → O₂ LSV, opening the most recent run by default. For the default workflow, CVs at up to 30 mV/s are grouped as ECSA and those at 75 mV/s or above as activation. Other CVs remain selectable. The LSV classifier uses the median current in the low-potential region, a cathodic plateau and the current drop at higher potential, then compares compatible potential windows to identify low-current backgrounds. Gas labels are used when current evidence is inconclusive. Unclassified LSVs allow either destination. The selected data are imported in acquisition order and converted to V/A. Check the scan rate, reference and Pt loading before calculation.
 
-ECSA requires an anodic sweep that covers both integration limits. If a limit is outside the measured range by at most one local sampling step, the calculator can use the available interval after you click **Use measured integration limits**. For a manual sloped baseline, enter the limits and their corresponding baseline currents together. Use the same limits when comparing ECSA across samples.
+H-upd ECSA integrates the last eligible anodic sweep over the measured interval. The default browser setting allows each requested endpoint to move inward by at most one local sampling step and 5 mV. Results show the actual limits, and the original settings remain visible. Turn this option off for a fixed window. For larger gaps, review the measured range and explicitly choose **Use measured integration limits** or enter new bounds. Use the same effective window when comparing ECSA across samples.
