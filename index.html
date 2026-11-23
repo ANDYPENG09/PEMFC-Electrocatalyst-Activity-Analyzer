@@ -545,6 +545,8 @@ footer { margin-top: 12px; color: var(--muted); font-size: 12px; text-align: cen
 [data-theme="classic"] .plot { background: #fff; }
 
 /* Editorial Grid */
+.editorial-pattern { display: none; }
+
 :root[data-theme="editorial"] {
   --ink: #181815;
   --ink2: #34322c;
@@ -595,20 +597,36 @@ footer { margin-top: 12px; color: var(--muted); font-size: 12px; text-align: cen
   border-radius: 0;
   transform: none;
   background:
-    repeating-linear-gradient(90deg, transparent 0 calc(12.5% - 1px), #2824150e calc(12.5% - 1px) 12.5%),
-    repeating-linear-gradient(0deg, transparent 0 47px, #2824150c 47px 48px);
+    repeating-linear-gradient(90deg, transparent 0 calc(12.5% - 1px), #28241508 calc(12.5% - 1px) 12.5%),
+    repeating-linear-gradient(0deg, transparent 0 47px, #28241508 47px 48px);
   box-shadow: none;
 }
-[data-theme="editorial"] .hero::after {
-  right: -8%;
-  bottom: -53%;
-  width: 64%;
-  height: 125%;
-  border: 2px solid #7f674183;
-  border-radius: 52% 48% 50% 50%;
-  transform: rotate(-27deg);
-  background: transparent;
-  box-shadow: 0 0 0 20px #7f674113, 0 0 0 41px #7f674113, 0 0 0 62px #7f674113;
+[data-theme="editorial"] .hero::after { display: none; }
+[data-theme="editorial"] .editorial-pattern {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  display: grid;
+  grid-template-rows: repeat(6, minmax(0, 1fr));
+  pointer-events: none;
+  user-select: none;
+  color: #30282025;
+  font-size: clamp(23px, 4.25vw, 54px);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: .41em;
+  -webkit-mask-image: radial-gradient(ellipse at center, #0004 16%, #000 74%);
+  mask-image: radial-gradient(ellipse at center, #0004 16%, #000 74%);
+}
+.editorial-pattern span { position: relative; }
+.editorial-pattern span:nth-child(even) { transform: translateX(2.8em); }
+.editorial-pattern span::before {
+  content: "PEMFC · CV · ORR　PEMFC · CV · ORR　PEMFC · CV · ORR　PEMFC · CV · ORR";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
 }
 [data-theme="editorial"] .workspace { display: block; }
 [data-theme="editorial"] .workspace-nav {
@@ -716,6 +734,14 @@ footer { margin-top: 12px; color: var(--muted); font-size: 12px; text-align: cen
 
 <a class="skip-link btn" href="#analysis">Skip to analysis</a>
 <header class="hero">
+  <div class="editorial-pattern" aria-hidden="true">
+    <span></span>
+    <span></span>
+    <span></span>
+    <span></span>
+    <span></span>
+    <span></span>
+  </div>
   <div class="hero-copy">
     <h1>PEMFC Electrocatalyst Activity Analyzer</h1>
     <p>CV / ECSA · ORR activity · Koutecký–Levich</p>
@@ -1056,7 +1082,7 @@ footer { margin-top: 12px; color: var(--muted); font-size: 12px; text-align: cen
 <!-- WORKBENCH END -->
   </main>
 </div>
-<footer>v1.5.1 &middot; MIT License &middot; Author: ANDYPENG09 &middot; Pure HTML/JS &middot; Offline &middot; No Origin Required</footer>
+<footer>v1.5.2 &middot; MIT License &middot; Author: ANDYPENG09 &middot; Pure HTML/JS &middot; Offline &middot; No Origin Required</footer>
 
 </div>
 
