@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.5.1 — 2026-11-23
+
+- Balance the Editorial Grid title across lines in both languages.
+
 ## v1.5.0 — 2026-11-23
 
 - Add four selectable appearances: Clear Glass, Blue Glass, Classic, and Editorial Grid. Restore the selected appearance independently of language.

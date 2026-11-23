@@ -214,7 +214,7 @@
   line-height: .99;
   font-weight: 790;
   letter-spacing: -.065em;
-  text-wrap: unset;
+  text-wrap: balance;
 }
 [data-theme="editorial"] .hero p { margin-top: 18px; }
 [data-theme="editorial"] .hero::before {
