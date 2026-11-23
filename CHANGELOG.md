@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.4.0 — 2026-11-23
+
+- Introduce the glass interface and section navigation, with side-by-side import and measurement settings on wider screens.
+- Keep plots on high-contrast surfaces and make the comparison table scroll independently on narrow screens.
+
 ## v1.3.3 — 2026-11-23
 
 - Default ECSA to the second CV cycle when two or more cycles are available. The cycle picker controls the plot, H-upd calculation and recorded result.

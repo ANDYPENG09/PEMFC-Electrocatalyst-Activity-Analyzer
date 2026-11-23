@@ -1,6 +1,9 @@
 /* Offline bilingual UI layer. English source text remains canonical; switch is reversible. */
 (() => {
   const exact = new Map([
+    ['PEMFC Electrocatalyst Activity Analyzer','PEMFC 电催化剂活性分析器'],
+    ['CV / ECSA · ORR activity · Koutecký–Levich','CV / ECSA · ORR 活性 · Koutecký–Levich'],
+    ['Skip to analysis','跳转至分析'],['Measurement settings','测量参数'],['Results','结果'],['Workbench','工作台'],
     ['Import Pine AfterMath PAAX','导入 Pine AfterMath PAAX'],['PAAX file','PAAX 文件'],['Select PAAX trace','选择 PAAX 曲线'],['Load into CV','导入 CV'],['Load into O₂ LSV','导入 O₂ LSV'],['Load into N₂ Background','导入 N₂ 背景'],
     ['Use measured integration limits','使用实测积分界限'],
     ['CV cycle for ECSA','ECSA 积分圈次'],['Automatic (cycle 2 when available)','自动（有第 2 圈时优先选用）'],
@@ -105,10 +108,9 @@
   function toggle(){lang=lang==='zh'?'en':'zh';try{localStorage.setItem('pemfc-ui-lang',lang);}catch(e){}apply();}
   window.uiLang=()=>lang;
   window.uiT=(en,zh)=>lang==='zh'?zh:en;
-  const header=document.querySelector('header');
+  const header=document.querySelector('.hero');
   if(header){
-    header.style.position='relative';
-    const b=document.createElement('button');b.id='langToggle';b.className='btn btn-secondary';b.type='button';b.style.cssText='position:absolute;right:0;top:0;min-width:64px';b.addEventListener('click',toggle);header.appendChild(b);
+    const b=document.createElement('button');b.id='langToggle';b.className='btn btn-secondary';b.type='button';b.addEventListener('click',toggle);header.appendChild(b);
   }
   new MutationObserver(ms=>{if(applying)return;for(const m of ms)for(const n of m.addedNodes){if(n.nodeType===Node.TEXT_NODE&&n.nodeValue.trim())translateNode(n);else if(n.nodeType===Node.ELEMENT_NODE)apply(n);}}).observe(document.body,{subtree:true,childList:true});
   apply();

@@ -1,6 +1,6 @@
 <!-- WORKBENCH START -->
-<section class="card" id="workbench">
-  <div class="card-title">Analysis Workbench · 自动 QC / 多样品比较</div>
+<section class="card" id="workbench" aria-labelledby="workbenchTitle">
+  <h2 class="card-title" id="workbenchTitle">Analysis Workbench · 自动 QC / 多样品比较</h2>
   <p class="hint">Capture the current CV/O₂/N₂ inputs, or import sample JSON files. Each capture is a snapshot; recapture after changing inputs. Analysis uses cathodic currents and a continuous diffusion plateau. Missing results are shown as —.</p>
   <div class="grid g-4">
     <div class="field"><label for="wbName">Sample name · 样品名称</label><input id="wbName" value="Sample-1" maxlength="80"></div>
@@ -22,20 +22,20 @@
   <p class="hint" id="wbStorage" role="status"></p>
   <div class="field"><label for="wbFiles">Import one or more sample JSON files (see README schema)</label><input type="file" id="wbFiles" accept=".json" multiple></div>
   <p id="wbMessage" role="status" aria-live="polite"></p>
-  <div style="overflow-x:auto"><table class="summary" id="wbTable"></table></div>
+  <div class="table-scroll" tabindex="0" aria-labelledby="workbenchTitle"><table class="summary" id="wbTable"></table></div>
   <p id="wbLegend" class="hint"></p>
   <div class="grid g-2"><div class="plot" id="wbCvPlot"></div><div class="plot" id="wbOrrPlot"></div></div>
   <div id="wbQC"></div>
   <div class="btn-row" id="wbDownloads"></div>
-  <div style="display:flex;gap:20px;margin:12px 0">
+  <div class="export-checks" style="margin:12px 0">
     <label><input type="checkbox" id="wbExportCv" checked style="width:auto"> CV comparison · CV 比较</label>
     <label><input type="checkbox" id="wbExportLsv" checked style="width:auto"> LSV comparison · LSV 比较</label>
   </div>
   <p class="hint">Checked samples appear in plots and analysis exports; history backup includes all samples. · 勾选样品用于绘图和分析导出；历史备份包含全部样品。</p>
   <button class="btn btn-secondary" id="wbPlotDownload">Download comparison plots</button>
 </section>
-<section class="card">
-  <div class="card-title">Multi-rpm Koutecký–Levich · 多转速拟合</div>
+<section class="card" id="kl" aria-labelledby="klTitle">
+  <h2 class="card-title" id="klTitle">Multi-rpm Koutecký–Levich · 多转速拟合</h2>
   <p class="hint">Paste/import CSV: rpm,potential_V_RHE,j_mA_cm2. Supply a single corrected ORR sweep per rpm, at least three distinct speeds. Values must already be in V vs RHE and mA/cm²; no background or potential correction is applied here.</p>
   <textarea id="klText" aria-label="Multi-rpm CSV" placeholder="rpm,potential_V_RHE,j_mA_cm2&#10;400,0.895,-1.5&#10;400,0.905,-1.4"></textarea>
   <div class="field"><label for="klFiles">Import one or more multi-rpm CSV files</label><input type="file" id="klFiles" accept=".csv,.txt" multiple></div>

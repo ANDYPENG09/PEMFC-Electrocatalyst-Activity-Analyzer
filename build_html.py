@@ -8,6 +8,7 @@ ROOT=Path(__file__).resolve().parent
 def build(check=False):
     path=ROOT/"index.html"
     old=path.read_text(encoding="utf-8")
+    glass="<!-- GLASS CSS START -->\n<style>\n"+(ROOT/"web/glass.css").read_text(encoding="utf-8").rstrip()+"\n</style>\n<!-- GLASS CSS END -->"
     html=(ROOT/"web/workbench.html").read_text(encoding="utf-8").strip()
     example_text=(ROOT/"web/example.json").read_text(encoding="utf-8").strip()
     if "</script" in example_text.lower(): raise ValueError("Unsafe example data")
@@ -18,7 +19,8 @@ def build(check=False):
     ui="<!-- WORKBENCH SCRIPT START -->\n<script>\n"+(ROOT/"web/workbench.js").read_text(encoding="utf-8")+"\n</script>\n<!-- WORKBENCH SCRIPT END -->"
     paax="<!-- PAAX SCRIPT START -->\n<script>\n"+(ROOT/"web/paax.js").read_text(encoding="utf-8")+"\n</script>\n<!-- PAAX SCRIPT END -->"
     new=old
-    for start,end,content,anchor in [("WORKBENCH START","WORKBENCH END",html,"<footer>"),
+    for start,end,content,anchor in [("GLASS CSS START","GLASS CSS END",glass,"</head>"),
+                                     ("WORKBENCH START","WORKBENCH END",html,"</main>"),
                                      ("EXAMPLE DATA START","EXAMPLE DATA END",example,"<!-- DEMO SCRIPT START -->"),
                                      ("ANALYSIS CORE START","ANALYSIS CORE END",core,"<script>"),
                                      ("DEMO SCRIPT START","DEMO SCRIPT END",demo,"<!-- ANALYSIS CORE START -->"),
